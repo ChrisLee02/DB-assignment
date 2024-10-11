@@ -190,16 +190,20 @@ class Database:
         headers = ["column_name", "type", "null", "key"]
         rows = []
         for col in table_metadata.columns.values():
-            col_name = col['name']
-            col_type = col['type']
-            col_null = 'N' if col.get('not_null', False) else 'Y'
-            col_key = ''
-            if col_name in table_metadata.pk_sets and any(col_name in fk['key_list'] for fk in table_metadata.fk_constraints):
-                col_key = 'PRI/FOR'
+            col_name = col["name"]
+            col_type = col["type"]
+            col_null = "N" if col.get("not_null", False) else "Y"
+            col_key = ""
+            if col_name in table_metadata.pk_sets and any(
+                col_name in fk["key_list"] for fk in table_metadata.fk_constraints
+            ):
+                col_key = "PRI/FOR"
             elif col_name in table_metadata.pk_sets:
-                col_key = 'PRI'
-            elif any(col_name in fk['key_list'] for fk in table_metadata.fk_constraints):
-                col_key = 'FOR'
+                col_key = "PRI"
+            elif any(
+                col_name in fk["key_list"] for fk in table_metadata.fk_constraints
+            ):
+                col_key = "FOR"
 
             rows.append([col_name, col_type, col_null, col_key])
 
@@ -243,8 +247,8 @@ class Database:
         for idx, column_name in enumerate(column_sequence):
             type_str: str = table_metadata.get_column(column_name)["type"]
             value = values[idx]
-            if isinstance(value, str) and value.lower() == 'null':
-                row[column_name] = 'null'
+            if isinstance(value, str) and value.lower() == "null":
+                row[column_name] = "null"
             elif type_str.startswith("char"):
                 char_length = int(type_str[5:-1])
                 row[column_name] = value[:char_length]
@@ -279,6 +283,6 @@ class Database:
         table_str = Formatter.format_table(headers, rows)
         footer = Formatter.format_footer(len(rows))
         print("\n".join([table_str, footer]))
-    
+
     def close(self):
         self.db.close()

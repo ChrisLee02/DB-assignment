@@ -1,5 +1,6 @@
 # formatter.py
 
+
 class Formatter:
     @staticmethod
     def format_table(headers, rows):
@@ -26,8 +27,12 @@ class Formatter:
         if not rows:
             table = "\n".join([separator_line, separator_line])
         else:
-            row_lines = [format_str.format(*[str(cell) for cell in row]) for row in rows]
-            table = "\n".join([separator_line, header_line] + row_lines + [separator_line])
+            row_lines = [
+                format_str.format(*[str(cell) for cell in row]) for row in rows
+            ]
+            table = "\n".join(
+                [separator_line, header_line] + row_lines + [separator_line]
+            )
 
         return table
 

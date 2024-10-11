@@ -31,14 +31,10 @@ class TableMetadata:
         pk_constraints: list = None,
         fk_constraints=None,
     ):
-        self.table_name = table_name.lower() 
-        self.columns = {
-            col["name"].lower(): col for col in columns
-        } 
-        self.pk_sets = (
-            pk_constraints[0]["key_list"] if pk_constraints else []
-        ) 
-        self.fk_constraints = fk_constraints or [] 
+        self.table_name = table_name.lower()
+        self.columns = {col["name"].lower(): col for col in columns}
+        self.pk_sets = pk_constraints[0]["key_list"] if pk_constraints else []
+        self.fk_constraints = fk_constraints or []
 
     def get_column(self, column_name):
         return self.columns.get(column_name.lower())
