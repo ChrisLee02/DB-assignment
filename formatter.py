@@ -4,6 +4,11 @@
 class Formatter:
     @staticmethod
     def format_table(headers, rows):
+
+        # calculate width as max width of whole header and rows.
+        # set each col_width as max width of column(header or any rows)
+        # for appearance, set minimum total width as 15
+
         col_widths = [len(header) for header in headers]
         for row in rows:
             for idx, cell in enumerate(row):
@@ -38,6 +43,7 @@ class Formatter:
 
     @staticmethod
     def format_footer(row_count):
+        # handle row/rows according to even and odd.
         return (
             f"{row_count} row in set" if row_count == 1 else f"{row_count} rows in set"
         )

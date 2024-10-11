@@ -10,6 +10,7 @@ class Database:
         self.db = db.DB()
         self.db.open("myDB.db", dbtype=db.DB_HASH, flags=db.DB_CREATE)
 
+    # Abstracted functions to manipulate db file.
     def get_table_metadata(self, table_name):
         table_meta_data_serialized = self.db.get(f"table_schema:{table_name}".encode())
         if not table_meta_data_serialized:
@@ -49,6 +50,7 @@ class Database:
     def table_exists(self, table_name):
         return self.db.get(f"table_schema:{table_name}".encode()) is not None
 
+    # methods to implement DDL and DML
     def create_table(
         self,
         table_name: str,
@@ -58,7 +60,7 @@ class Database:
     ):
         table_name = table_name.lower()
 
-        # 에러 처리
+        # error handling logic
         column_names = [col["name"].lower() for col in columns]
         if len(column_names) != len(set(column_names)):
             MessageHandler.print_error(MessageKeys.DUPLICATE_COLUMN_DEF_ERROR)
@@ -95,7 +97,6 @@ class Database:
                     )
                     return
 
-        # 외래 키 참조 체크
         for fk in fk_constraints or []:
             for key_idx, fk_col_name in enumerate(fk["key_list"]):
                 ref_table_name = fk["ref_table"].lower()
@@ -104,6 +105,7 @@ class Database:
                     MessageHandler.print_error(MessageKeys.REFERENCE_EXISTENCE_ERROR)
                     return
 
+                # use generator for concise code
                 fk_col = next(
                     (
                         col
@@ -131,7 +133,7 @@ class Database:
             table_name, columns, pk_constraints, fk_constraints
         )
 
-        # 기본 키 컬럼을 not null로 설정
+        # set pk columns as not null
         for pk in pk_constraints or []:
             for col_name in pk["key_list"]:
                 if col_name.lower() in table_metadata.columns:
@@ -156,7 +158,7 @@ class Database:
     def drop_table(self, table_name: str):
         table_name = table_name.lower()
 
-        if not self.get_table_metadata(table_name):
+        if not self.table_exists(table_name):
             MessageHandler.print_error(MessageKeys.NO_SUCH_TABLE, command_name="Drop")
             return
 
@@ -170,8 +172,9 @@ class Database:
         fk_metadata_list = [
             fk for fk in fk_metadata_list if fk.child_table_name != table_name
         ]
-        self.put_foreign_key_metadata(fk_metadata_list)
 
+        # its own metadata and data, and regarded foreign key information should be deleted
+        self.put_foreign_key_metadata(fk_metadata_list)
         self.delete_table_metadata(table_name)
         self.delete_table_data(table_name)
 
@@ -207,16 +210,21 @@ class Database:
 
             rows.append([col_name, col_type, col_null, col_key])
 
+        # just generate header, rows and footer information
+        # formatter class formats with given data.
         table_str = Formatter.format_table(headers, rows)
         footer = Formatter.format_footer(len(rows))
         print("\n".join([table_str, footer]))
 
     def show_tables(self):
+        # use berkeley db's cursor to look around entire key-value
         cursor = self.db.cursor()
         table_names = []
         record = cursor.first()
         while record:
             key, _ = record
+
+            # filter by prefix
             if key.decode().startswith("table_schema:"):
                 table_name = key.decode().split("table_schema:")[1]
                 table_names.append(table_name)
@@ -241,6 +249,7 @@ class Database:
         rows: list = self.get_table_data(table_name) or []
         row = dict()
 
+        # if only values received, use schema's column sequence.
         if column_sequence is None:
             column_sequence = [columns_dict[i]["name"] for i in columns_dict]
 
@@ -273,11 +282,10 @@ class Database:
         columns_dict = table_metadata.columns
         column_name_list = [columns_dict[i]["name"] for i in columns_dict]
         rows_data: list = self.get_table_data(table_name) or []
-
         headers = column_name_list
         rows = []
         for row_data in rows_data:
-            row = [str(row_data.get(col, "NULL")) for col in column_name_list]
+            row = [str(row_data.get(col_name, "NULL")) for col_name in column_name_list]
             rows.append(row)
 
         table_str = Formatter.format_table(headers, rows)

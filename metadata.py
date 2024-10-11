@@ -1,5 +1,7 @@
 from formatter import Formatter
 
+# in this file, classes for describing metadata is defined.
+
 
 class ForeignKeyMetadata:
     def __init__(
@@ -16,6 +18,7 @@ class ForeignKeyMetadata:
         self.referenced_parent_column_list = referenced_parent_column_list
         self.on_delete_action = on_delete_action.lower()
 
+    # just for debugging
     def describe(self):
         return (
             f"FK: {self.child_table_name}.{self.child_column_name_list} -> {self.referenced_parent_table}.{self.referenced_parent_column_list} "

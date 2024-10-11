@@ -1,3 +1,6 @@
+# modularize message key and value.
+
+
 class MessageKeys:
     SYNTAX_ERROR = "SyntaxError"
     DUPLICATE_COLUMN_DEF_ERROR = "DuplicateColumnDefError"

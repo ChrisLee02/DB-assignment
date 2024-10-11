@@ -1,10 +1,11 @@
-# parser.py
-
 from lark import Transformer
 from database import Database
 from utils import get_first_child_by_rule
 
 
+# MyTransformer class extents lark.Transformer.
+# Handles each case of command with corresponding action
+# from parsed tree, extract data and format it as available for function's argument
 class MyTransformer(Transformer):
     def __init__(self, database: Database):
         self.database = database
