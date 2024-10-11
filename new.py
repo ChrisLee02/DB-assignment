@@ -3,43 +3,104 @@ from berkeleydb import db
 import pickle
 
 
+class MessageKeys:
+    SYNTAX_ERROR = "SyntaxError"
+    DUPLICATE_COLUMN_DEF_ERROR = "DuplicateColumnDefError"
+    DUPLICATE_PRIMARY_KEY_DEF_ERROR = "DuplicatePrimaryKeyDefError"
+    REFERENCE_TYPE_ERROR = "ReferenceTypeError"
+    REFERENCE_NON_PRIMARY_KEY_ERROR = "ReferenceNonPrimaryKeyError"
+    REFERENCE_EXISTENCE_ERROR = "ReferenceExistenceError"
+    PRIMARY_KEY_COLUMN_DEF_ERROR = "PrimaryKeyColumnDefError"
+    FOREIGN_KEY_COLUMN_DEF_ERROR = "ForeignKeyColumnDefError"
+    TABLE_EXISTENCE_ERROR = "TableExistenceError"
+    CHAR_LENGTH_ERROR = "CharLengthError"
+    NO_SUCH_TABLE = "NoSuchTable"
+    DROP_REFERENCED_TABLE_ERROR = "DropReferencedTableError"
+    SELECT_TABLE_EXISTENCE_ERROR = "SelectTableExistenceError"
+    CREATE_TABLE_SUCCESS = "CreateTableSuccess"
+    DROP_SUCCESS = "DropSuccess"
+    INSERT_RESULT = "InsertResult"
+
+
+# Define constants for message values
+class MessageValues:
+    SYNTAX_ERROR = "Syntax error"
+    DUPLICATE_COLUMN_DEF_ERROR = (
+        "Create table has failed: column definition is duplicated"
+    )
+    DUPLICATE_PRIMARY_KEY_DEF_ERROR = (
+        "Create table has failed: primary key definition is duplicated"
+    )
+    REFERENCE_TYPE_ERROR = "Create table has failed: foreign key references wrong type"
+    REFERENCE_NON_PRIMARY_KEY_ERROR = (
+        "Create table has failed: foreign key references non primary key column"
+    )
+    REFERENCE_EXISTENCE_ERROR = (
+        "Create table has failed: foreign key references non existing table or column"
+    )
+    PRIMARY_KEY_COLUMN_DEF_ERROR = "Create table has failed: cannot define non-existing column '{col_name}' as primary key"
+    FOREIGN_KEY_COLUMN_DEF_ERROR = "Create table has failed: cannot define non-existing column '{col_name}' as foreign key"
+    TABLE_EXISTENCE_ERROR = (
+        "Create table has failed: table with the same name already exists"
+    )
+    CHAR_LENGTH_ERROR = "Char length should be over 0"
+    NO_SUCH_TABLE = "{command_name} has failed: no such table"
+    DROP_REFERENCED_TABLE_ERROR = (
+        "Drop table has failed: '{table_name}' is referenced by another table"
+    )
+    SELECT_TABLE_EXISTENCE_ERROR = "Select has failed: '{table_name}' does not exist"
+    CREATE_TABLE_SUCCESS = "{table_name} table is created"
+    DROP_SUCCESS = "{table_name} table is dropped"
+    INSERT_RESULT = "The row is inserted"
+
+
 class MessageHandler:
     @staticmethod
     def print_error(message_type, **kwargs):
         messages = {
-            "SyntaxError": "Syntax error",
-            "DuplicateColumnDefError": "Create table has failed: column definition is duplicated",
-            "DuplicatePrimaryKeyDefError": "Create table has failed: primary key definition is duplicated",
-            "ReferenceTypeError": "Create table has failed: foreign key references wrong type",
-            "ReferenceNonPrimaryKeyError": "Create table has failed: foreign key references non primary key column",
-            "ReferenceExistenceError": "Create table has failed: foreign key references non existing table or column",
-            "PrimaryKeyColumnDefError": f"Create table has failed: cannot define non-existing column '{kwargs.get('col_name')}' as primary key",
-            "ForeignKeyCol1umnDefError": f"Create table has failed: cannot define non-existing column '{kwargs.get('col_name')}' as foreign key",
-            "TableExistenceError": "Create table has failed: table with the same name already exists",
-            "CharLengthError": "Char length should be over 0",
-            "NoSuchTable": f"{kwargs.get('command_name')} has failed: no such table",
-            "DropReferencedTableError": f"Drop table has failed: '{kwargs.get('table_name')}' is referenced by another table",
-            "SelectTableExistenceError": f"Select has failed: '{kwargs.get('table_name')}' does not exist",
+            MessageKeys.SYNTAX_ERROR: MessageValues.SYNTAX_ERROR,
+            MessageKeys.DUPLICATE_COLUMN_DEF_ERROR: MessageValues.DUPLICATE_COLUMN_DEF_ERROR,
+            MessageKeys.DUPLICATE_PRIMARY_KEY_DEF_ERROR: MessageValues.DUPLICATE_PRIMARY_KEY_DEF_ERROR,
+            MessageKeys.REFERENCE_TYPE_ERROR: MessageValues.REFERENCE_TYPE_ERROR,
+            MessageKeys.REFERENCE_NON_PRIMARY_KEY_ERROR: MessageValues.REFERENCE_NON_PRIMARY_KEY_ERROR,
+            MessageKeys.REFERENCE_EXISTENCE_ERROR: MessageValues.REFERENCE_EXISTENCE_ERROR,
+            MessageKeys.PRIMARY_KEY_COLUMN_DEF_ERROR: MessageValues.PRIMARY_KEY_COLUMN_DEF_ERROR,
+            MessageKeys.FOREIGN_KEY_COLUMN_DEF_ERROR: MessageValues.FOREIGN_KEY_COLUMN_DEF_ERROR,
+            MessageKeys.TABLE_EXISTENCE_ERROR: MessageValues.TABLE_EXISTENCE_ERROR,
+            MessageKeys.CHAR_LENGTH_ERROR: MessageValues.CHAR_LENGTH_ERROR,
+            MessageKeys.NO_SUCH_TABLE: MessageValues.NO_SUCH_TABLE,
+            MessageKeys.DROP_REFERENCED_TABLE_ERROR: MessageValues.DROP_REFERENCED_TABLE_ERROR,
+            MessageKeys.SELECT_TABLE_EXISTENCE_ERROR: MessageValues.SELECT_TABLE_EXISTENCE_ERROR,
         }
-        print(messages.get(message_type, "Unknown error"))
+        message_template = messages.get(message_type, "Unknown error")
+        try:
+            message = message_template.format(**kwargs)
+        except KeyError as e:
+            missing_key = e.args[0]
+            print(
+                f"Error: Missing keyword argument '{missing_key}' for message formatting."
+            )
+            return
+        print(message)
 
     @staticmethod
     def print_success(message_type, **kwargs):
         messages = {
-            "CreateTableSuccess": f"{kwargs.get('table_name')} table is created",
-            "DropSuccess": f"{kwargs.get('table_name')} table is dropped",
-            "InsertResult": "The row is inserted",
+            MessageKeys.CREATE_TABLE_SUCCESS: MessageValues.CREATE_TABLE_SUCCESS,
+            MessageKeys.DROP_SUCCESS: MessageValues.DROP_SUCCESS,
+            MessageKeys.INSERT_RESULT: MessageValues.INSERT_RESULT,
         }
-        print(messages.get(message_type, "Unknown message"))
+        message_template = messages.get(message_type, "Unknown message")
+        try:
+            message = message_template.format(**kwargs)
+        except KeyError as e:
+            missing_key = e.args[0]
+            print(
+                f"Error: Missing keyword argument '{missing_key}' for message formatting."
+            )
+            return
+        print(message)
 
-class ErrorHandler:
-    @staticmethod
-    def handle_no_such_table(database, table_name, command_name):
-        if not database.db.get(f"table_schema:{table_name}".encode()):
-            MessageHandler.print_error("NoSuchTable", command_name=command_name)
-            return True
-        return False
-    
 
 class ForeignKeyMetadata:
     def __init__(
@@ -63,78 +124,156 @@ class ForeignKeyMetadata:
         )
 
 
+class Formatter:
+    @staticmethod
+    def format_table(headers, rows):
+        # Calculate column widths
+        col_widths = [len(header) for header in headers]
+        for row in rows:
+            for idx, cell in enumerate(row):
+                col_widths[idx] = max(col_widths[idx], len(str(cell)))
+
+        # Build the format string
+        format_str = " | ".join(f"{{:<{w}}}" for w in col_widths)
+
+        # Format header
+        header_line = format_str.format(*headers)
+        # Compute total width of the header line
+        total_width = len(header_line)
+        # Build the separator line
+        separator_line = "-" * total_width
+
+        # Format rows
+        row_lines = [format_str.format(*[str(cell) for cell in row]) for row in rows]
+
+        # Combine all parts in the required order:
+        # separator, header, rows, separator
+        table = "\n".join([separator_line, header_line] + row_lines + [separator_line])
+
+        return table
+
+    @staticmethod
+    def format_footer(row_count):
+        return (
+            f"{row_count} row in set" if row_count == 1 else f"{row_count} rows in set"
+        )
+
+    @staticmethod
+    def format_table_list(table_names):
+        if not table_names:
+            return "No tables found."
+        else:
+            # Calculate the maximum length of table names
+            max_length = max(len(name) for name in table_names)
+            format_str = f"{{:<{max_length}}}"
+
+            # Build separator line
+            total_width = max_length
+            separator_line = "-" * total_width
+
+            # Format rows
+            row_lines = [format_str.format(name) for name in table_names]
+
+            # Combine all parts
+            table = "\n".join([separator_line] + row_lines + [separator_line])
+            footer = Formatter.format_footer(len(table_names))
+            return "\n".join([table, footer])
+
+
 class TableMetadata:
     def __init__(
         self,
         table_name,
         columns,
-        pk_constraints: list[list] = None,
+        pk_constraints: list = None,
         fk_constraints=None,
     ):
-        self.table_name = table_name.lower()  # 테이블 이름을 소문자로 변환해 저장
+        self.table_name = table_name.lower()  # Store table name in lowercase
         self.columns = {
             col["name"].lower(): col for col in columns
-        }  # 컬럼 정보도 소문자로 저장
+        }  # Store column info in lowercase
         self.pk_sets = (
             pk_constraints[0]["key_list"] if pk_constraints else []
-        )  # 기본 키 정보 초기화
-        self.fk_constraints = fk_constraints or []  # 외래 키 정보 초기화
+        )  # Initialize primary key info
+        self.fk_constraints = fk_constraints or []  # Initialize foreign key info
 
     def get_column(self, column_name):
         return self.columns.get(column_name.lower())
 
     def describe(self):
-        header = "column_name     | type       | null | key"
-        separator = "-----------------------------------------------------------------"
-        rows = [
-            f"{col['name']:<15} | {col['type']:<10} | {'N' if col.get('not_null', False) else 'Y':<4} | {'PRI/FOR' if col['name'] in self.pk_sets and any(col['name'] in fk['key_list'] for fk in self.fk_constraints) else ('PRI' if col['name'] in self.pk_sets else ('FOR' if any(col['name'] in fk['key_list'] for fk in self.fk_constraints) else '')):<5}"
-            for col in self.columns.values()
-        ]
-        return "\n".join(
-            [header, separator]
-            + rows
-            + [
-                separator,
-                (
-                    f"{len(rows)} row in set"
-                    if len(rows) == 1
-                    else f"{len(rows)} rows in set"
-                ),
-            ]
-        )
+        headers = ["column_name", "type", "null", "key"]
+        rows = []
+        for col in self.columns.values():
+            col_name = col["name"]
+            col_type = col["type"]
+            col_null = "N" if col.get("not_null", False) else "Y"
+            col_key = ""
+            if col_name in self.pk_sets and any(
+                col_name in fk["key_list"] for fk in self.fk_constraints
+            ):
+                col_key = "PRI/FOR"
+            elif col_name in self.pk_sets:
+                col_key = "PRI"
+            elif any(col_name in fk["key_list"] for fk in self.fk_constraints):
+                col_key = "FOR"
+
+            rows.append([col_name, col_type, col_null, col_key])
+
+        table_str = Formatter.format_table(headers, rows)
+        footer = Formatter.format_footer(len(rows))
+        return "\n".join([table_str, footer])
 
 
-
-
-
-# DuplicateColumnDefError
-# DuplicatePrimaryKeyDefError
-# ReferenceTypeError
-# ReferenceNonPrimaryKeyError
-# ReferenceExistenceError
-# PrimaryKeyColumnDefError
-# ForeignKeyColumnDefError
-# TableExistenceError
-# CharLengthError
 class Database:
     def __init__(self):
         self.db = db.DB()
         self.db.open("myDB.db", dbtype=db.DB_HASH, flags=db.DB_CREATE)
 
-    # todo: 테이블 접근하는 함수 추상화.
-
+    # Abstracted methods for database access
     def get_table_metadata(self, table_name):
         table_meta_data_serialized = self.db.get(f"table_schema:{table_name}".encode())
         if not table_meta_data_serialized:
             return None
         return pickle.loads(table_meta_data_serialized)
 
+    def put_table_metadata(self, table_name, table_metadata):
+        self.db.put(f"table_schema:{table_name}".encode(), pickle.dumps(table_metadata))
+
+    def delete_table_metadata(self, table_name):
+        self.db.delete(f"table_schema:{table_name}".encode())
+
+    def get_table_data(self, table_name):
+        table_data_serialized = self.db.get(f"table_data:{table_name}".encode())
+        if not table_data_serialized:
+            return None
+        return pickle.loads(table_data_serialized)
+
+    def put_table_data(self, table_name, data):
+        self.db.put(f"table_data:{table_name}".encode(), pickle.dumps(data))
+
+    def delete_table_data(self, table_name):
+        self.db.delete(f"table_data:{table_name}".encode())
+
+    def get_foreign_key_metadata(self):
+        fk_metadata_serialized = self.db.get("foreign_key_metadata".encode())
+        if not fk_metadata_serialized:
+            return []
+        return pickle.loads(fk_metadata_serialized)
+
+    def put_foreign_key_metadata(self, fk_metadata_list):
+        self.db.put("foreign_key_metadata".encode(), pickle.dumps(fk_metadata_list))
+
+    def delete_foreign_key_metadata(self):
+        self.db.delete("foreign_key_metadata".encode())
+
+    def table_exists(self, table_name):
+        return self.db.get(f"table_schema:{table_name}".encode()) is not None
 
     def create_table(
         self,
         table_name: str,
         columns: list,
-        pk_constraints: list[list] | None = None,
+        pk_constraints: list = None,
         fk_constraints=None,
     ):
         table_name = table_name.lower()
@@ -144,17 +283,17 @@ class Database:
         # Handling duplicate column definitions - DuplicateColumnDefError
         column_names = [col["name"].lower() for col in columns]
         if len(column_names) != len(set(column_names)):
-            MessageHandler.print_error("DuplicateColumnDefError")
+            MessageHandler.print_error(MessageKeys.DUPLICATE_COLUMN_DEF_ERROR)
             return
 
         # Handling multiple primary key definitions - DuplicatePrimaryKeyDefError
-        if pk_constraints != None and len(pk_constraints) > 1:
-            MessageHandler.print_error("DuplicatePrimaryKeyDefError")
+        if pk_constraints is not None and len(pk_constraints) > 1:
+            MessageHandler.print_error(MessageKeys.DUPLICATE_PRIMARY_KEY_DEF_ERROR)
             return
 
         # Handling table with the same name already exists - TableExistenceError
-        if self.db.get(f"table_schema:{table_name}".encode()):
-            MessageHandler.print_error("TableExistenceError")
+        if self.table_exists(table_name):
+            MessageHandler.print_error(MessageKeys.TABLE_EXISTENCE_ERROR)
             return
 
         for col in columns:
@@ -162,7 +301,7 @@ class Database:
             if col["type"].startswith("char"):
                 char_length = int(col["type"][5:-1])
                 if char_length < 1:
-                    MessageHandler.print_error("CharLengthError")
+                    MessageHandler.print_error(MessageKeys.CHAR_LENGTH_ERROR)
                     return
 
         for pk in pk_constraints or []:
@@ -170,7 +309,7 @@ class Database:
             for col_name in pk["key_list"]:
                 if col_name.lower() not in column_names:
                     MessageHandler.print_error(
-                        "PrimaryKeyColumnDefError", col_name=col_name
+                        MessageKeys.PRIMARY_KEY_COLUMN_DEF_ERROR, col_name=col_name
                     )
                     return
 
@@ -179,44 +318,45 @@ class Database:
             for col_name in fk["key_list"]:
                 if col_name.lower() not in column_names:
                     MessageHandler.print_error(
-                        "ForeignKeyColumnDefError", col_name=col_name
+                        MessageKeys.FOREIGN_KEY_COLUMN_DEF_ERROR, col_name=col_name
                     )
                     return
 
         # Reference existence and type check for foreign keys
-        for fk in fk_constraints:
+        for fk in fk_constraints or []:
             for key_idx, fk_col_name in enumerate(fk["key_list"]):
                 ref_table_name = fk["ref_table"].lower()
-                ref_table_data = self.db.get(f"table_schema:{ref_table_name}".encode())
+                ref_table_metadata = self.get_table_metadata(ref_table_name)
                 # Handling foreign key references non-existing table - ReferenceExistenceError
-                if not ref_table_data:
-                    MessageHandler.print_error("ReferenceExistenceError")
+                if not ref_table_metadata:
+                    MessageHandler.print_error(MessageKeys.REFERENCE_EXISTENCE_ERROR)
                     return
-                ref_table_metadata = pickle.loads(ref_table_data)
-                ref_col_name = fk["other_key_list"][key_idx]
 
-                fk_col = [
-                    col for col in columns if col["name"].lower() == fk_col_name.lower()
-                ][0]
+                fk_col = next(
+                    (
+                        col
+                        for col in columns
+                        if col["name"].lower() == fk_col_name.lower()
+                    ),
+                    None,
+                )
 
                 ref_col_name = fk["other_key_list"][key_idx]
                 ref_col = ref_table_metadata.get_column(ref_col_name)
 
                 if not ref_col:
                     # Handling foreign key references non-existing column - ReferenceExistenceError
-                    MessageHandler.print_error("ReferenceExistenceError")
+                    MessageHandler.print_error(MessageKeys.REFERENCE_EXISTENCE_ERROR)
                     return
                 # Type check
                 if fk_col["type"] != ref_col["type"]:
                     # Handling foreign key references wrong type - ReferenceTypeError
-                    MessageHandler.print_error("ReferenceTypeError")
+                    MessageHandler.print_error(MessageKeys.REFERENCE_TYPE_ERROR)
                     return
 
-        # Check if the referenced column is a primary key for the entire key list
-        for fk in fk_constraints or []:
-            # Handling foreign key references non-primary key column - ReferenceNonPrimaryKeyError
+            # Check if the referenced column is a primary key for the entire key list
             if set(fk["other_key_list"]) != set(ref_table_metadata.pk_sets):
-                MessageHandler.print_error("ReferenceNonPrimaryKeyError")
+                MessageHandler.print_error(MessageKeys.REFERENCE_NON_PRIMARY_KEY_ERROR)
                 return
 
         table_metadata = TableMetadata(
@@ -228,161 +368,137 @@ class Database:
                 if col_name.lower() in table_metadata.columns:
                     table_metadata.columns[col_name.lower()]["not_null"] = True
 
-        fk_metadata_list_data = self.db.get("foreign_key_metadata".encode())
-        fk_metadata_list = (
-            pickle.loads(fk_metadata_list_data) if fk_metadata_list_data else []
-        )
+        fk_metadata_list = self.get_foreign_key_metadata()
         for fk in fk_constraints or []:
-            print(fk)
             fk_metadata_list.append(
                 ForeignKeyMetadata(
                     table_name, fk["key_list"], fk["ref_table"], fk["other_key_list"]
                 )
             )
 
-        self.db.put(f"table_schema:{table_name}".encode(), pickle.dumps(table_metadata))
-        self.db.put(f"table_data:{table_name}".encode(), pickle.dumps([]))
-        self.db.put("foreign_key_metadata".encode(), pickle.dumps(fk_metadata_list))
+        self.put_table_metadata(table_name, table_metadata)
+        self.put_table_data(table_name, [])
+        self.put_foreign_key_metadata(fk_metadata_list)
 
-        MessageHandler.print_success("CreateTableSuccess", table_name=table_name)
+        MessageHandler.print_success(
+            MessageKeys.CREATE_TABLE_SUCCESS, table_name=table_name
+        )
 
     def print_fk_metadata(self):
-        fk_metadata_list_data = self.db.get("foreign_key_metadata".encode())
-        fk_metadata_list = (
-            pickle.loads(fk_metadata_list_data) if fk_metadata_list_data else []
-        )
+        fk_metadata_list = self.get_foreign_key_metadata()
         [print(i.describe()) for i in fk_metadata_list]
 
     def drop_table(self, table_name: str):
         table_name = table_name.lower()
 
-        if(ErrorHandler.handle_no_such_table(self, table_name, "Drop")):
+        if not self.get_table_metadata(table_name):
+            MessageHandler.print_error(MessageKeys.NO_SUCH_TABLE, command_name="Drop")
             return
 
-        fk_metadata_list_data = self.db.get("foreign_key_metadata".encode())
-        fk_metadata_list = (
-            pickle.loads(fk_metadata_list_data) if fk_metadata_list_data else []
-        )
-        filtered_by_ref_table_fk_metadata_list = list(
-            filter(lambda x: x.referenced_parent_table == table_name, fk_metadata_list)
-        )
-        if len(filtered_by_ref_table_fk_metadata_list) > 0:
+        fk_metadata_list = self.get_foreign_key_metadata()
+        # Check if the table is referenced by any foreign keys
+        if any(fk.referenced_parent_table == table_name for fk in fk_metadata_list):
             MessageHandler.print_error(
-                "DropReferencedTableError", table_name=table_name
+                MessageKeys.DROP_REFERENCED_TABLE_ERROR, table_name=table_name
             )
             return
 
-        deleted_fk_metadata_list = list(
-            filter(lambda x: not x.child_table_name == table_name, fk_metadata_list)
-        )
+        # Remove foreign keys where the child table is being dropped
+        fk_metadata_list = [
+            fk for fk in fk_metadata_list if fk.child_table_name != table_name
+        ]
+        self.put_foreign_key_metadata(fk_metadata_list)
 
-        self.db.put(
-            "foreign_key_metadata".encode(), pickle.dumps(deleted_fk_metadata_list)
-        )
-        self.db.delete(f"table_schema:{table_name}".encode())
-        self.db.delete(f"table_data:{table_name}".encode())
+        self.delete_table_metadata(table_name)
+        self.delete_table_data(table_name)
 
-        MessageHandler.print_success("DropSuccess", table_name=table_name)
+        MessageHandler.print_success(MessageKeys.DROP_SUCCESS, table_name=table_name)
 
     def describe_table(self, table_name: str, command_name):
         table_name = table_name.lower()
-        if ErrorHandler.handle_no_such_table(self, table_name, command_name):
+
+        table_metadata: TableMetadata = self.get_table_metadata(table_name)
+        if not table_metadata:
+            MessageHandler.print_error(
+                MessageKeys.NO_SUCH_TABLE, command_name=command_name
+            )
             return
 
-        table_data = self.db.get(f"table_schema:{table_name}".encode())
-        table_metadata: TableMetadata = pickle.loads(table_data)
         print(table_metadata.describe())
 
     def show_tables(self):
         cursor = self.db.cursor()
-        header = "----------------------"
-        rows = []
+        table_names = []
         record = cursor.first()
         while record:
             key, _ = record
             if key.decode().startswith("table_schema:"):
                 table_name = key.decode().split("table_schema:")[1]
-                rows.append(table_name)
+                table_names.append(table_name)
             record = cursor.next()
         cursor.close()
 
-        if not rows:
-            print("No tables found.")
-        else:
-            print(header)
-            print("\n".join(rows))
-            print(header)
-            print(
-                f"{len(rows)} row in set"
-                if len(rows) == 1
-                else f"{len(rows)} rows in set"
-            )
+        output = Formatter.format_table_list(table_names)
+        print(output)
 
     def insert_into_table(
         self, table_name: str, values: list, column_sequence: list = None
     ):
         table_name = table_name.lower()
-        if(ErrorHandler.handle_no_such_table(self, table_name, "Insert into")):
+        table_metadata: TableMetadata = self.get_table_metadata(table_name)
+        if not table_metadata:
+            MessageHandler.print_error(
+                MessageKeys.NO_SUCH_TABLE, command_name="Insert into"
+            )
             return
-       
-        table_meta_data_serialized = self.db.get(f"table_schema:{table_name}".encode())
-        table_meta_data: TableMetadata = pickle.loads(table_meta_data_serialized)
 
-        columns_list = table_meta_data.columns
-        rows: list = pickle.loads(self.db.get(f"table_data:{table_name}".encode()))
-        # 딕셔너리 내부 순서는 신경쓸 필요가 없다. select 시점에 메타데이터의 순서대로 꺼내올 것.
+        columns_dict = table_metadata.columns
+        rows: list = self.get_table_data(table_name) or []
         row = dict()
 
-        if column_sequence == None:
-            column_sequence = [columns_list[i]["name"] for i in columns_list]
+        if column_sequence is None:
+            column_sequence = [columns_dict[i]["name"] for i in columns_dict]
 
         for idx, column_name in enumerate(column_sequence):
-            type: str = table_meta_data.get_column(column_name)["type"]
+            type_str: str = table_metadata.get_column(column_name)["type"]
             value = values[idx]
-            if type.startswith("char"):
-                char_length = int(type[5:-1])
+            if type_str.startswith("char"):
+                char_length = int(type_str[5:-1])
                 row[column_name] = value[:char_length]
             else:
                 row[column_name] = value
 
         rows.append(row)
-        self.db.put(f"table_data:{table_name}".encode(), pickle.dumps(rows))
-        MessageHandler.print_success("InsertResult")
+        self.put_table_data(table_name, rows)
+        MessageHandler.print_success(MessageKeys.INSERT_RESULT)
 
     def select_from_table(self, table_name: str):
-        # Placeholder for select implementation
         table_name = table_name.lower()
-        table_meta_data_serialized = self.db.get(f"table_schema:{table_name}".encode())
-        if not table_meta_data_serialized:
+
+        table_metadata: TableMetadata = self.get_table_metadata(table_name)
+
+        if not table_metadata:
             MessageHandler.print_error(
-                "SelectTableExistenceError", table_name=table_name
+                MessageKeys.SELECT_TABLE_EXISTENCE_ERROR, table_name=table_name
             )
             return
 
-        table_meta_data: TableMetadata = pickle.loads(table_meta_data_serialized)
+        columns_dict = table_metadata.columns
+        column_name_list = [columns_dict[i]["name"] for i in columns_dict]
+        rows_data: list = self.get_table_data(table_name) or []
 
-        columns_list = table_meta_data.columns
-        column_name_list = [columns_list[i]["name"] for i in columns_list]
-        rows: list = pickle.loads(self.db.get(f"table_data:{table_name}".encode()))
-        # 헤더와 구분선 생성
-        header = " | ".join(f"{col_name:<15}" for col_name in column_name_list)
-        separator = "-" * len(header)
+        headers = column_name_list
+        rows = []
+        for row_data in rows_data:
+            row = [str(row_data.get(col, "NULL")) for col in column_name_list]
+            rows.append(row)
 
-        # 헤더 출력
-        print(header)
-        print(separator)
-
-        # 각 행 출력 (열 길이에 맞춰 정렬)
-        for row in rows:
-            row_values = " | ".join(
-                f"{str(row.get(col, 'NULL')):<15}" for col in column_name_list
-            )
-            print(row_values)
-
-        print(separator)
-        print(f"{len(rows)} row in set" if len(rows) == 1 else f"{len(rows)} rows in set")
-
-        return
+        if rows:
+            table_str = Formatter.format_table(headers, rows)
+            footer = Formatter.format_footer(len(rows))
+            print("\n".join([table_str, footer]))
+        else:
+            print("Empty set")
 
     def close(self):
         self.db.close()
@@ -402,11 +518,8 @@ class MyTransformer(Transformer):
     def create_table_query(self, items):
         table_name = items[2].children[0].lower()
         column_list = []
-        
-        pk_constraints = (
-            []
-        )  
-        # DuplicatePrimaryKeyDefError should be handled inside of database class
+
+        pk_constraints = []
         fk_constraints = []
         for table_element in items[3].children[1:-1]:
             if table_element.children[0].data == "column_definition":
@@ -425,7 +538,7 @@ class MyTransformer(Transformer):
                 is_not_null = column_definition.children[2] != None
 
                 column_list.append(
-                    {"name": name, "type": type, "null": not is_not_null}
+                    {"name": name, "type": type, "not_null": is_not_null}
                 )
 
             else:
@@ -481,11 +594,9 @@ class MyTransformer(Transformer):
     def select_query(self, items):
         from_clause = items[2].children[0]
         table_reference_list = from_clause.children[1]
-        # naive implementation for now,
-        # should be generallized in 1-3
         referred_table = table_reference_list.children[0]
         referred_table_name_tree = referred_table.children[0]
-        
+
         referred_table_name = referred_table_name_tree.children[0].lower()
         self.database.select_from_table(referred_table_name)
 
@@ -497,13 +608,12 @@ class MyTransformer(Transformer):
 
     def describe_query(self, items):
         self.database.describe_table(items[1].children[0], "Describe")
-    
+
     def explain_query(self, items):
         self.database.describe_table(items[1].children[0], "Explain")
 
     def desc_query(self, items):
         self.database.describe_table(items[1].children[0], "Desc")
-
 
     def insert_query(self, items):
 
@@ -533,8 +643,6 @@ class MyTransformer(Transformer):
                 column_sequence.append(column_name)
             self.database.insert_into_table(table_name, values, column_sequence)
 
-    
-
     def exit_command(self, items):
         self.database.close()
         exit()
@@ -549,7 +657,7 @@ def print_prompt():
 # The input ends when a semicolon is located at the end of a line
 def handleInput():
     print_prompt()
-    multi_lines: list[str] = []
+    multi_lines = []
     while True:
         input_line = input().strip()
         multi_lines.append(input_line)
@@ -567,90 +675,18 @@ database = Database()
 transformer = MyTransformer(database)
 
 
-# End-to-End 테스트 함수
+# End-to-End test function
 def run_tests():
     create_table_test_queries = [
         # 1. Valid table creation - students table
         "CREATE TABLE students (student_id INT NOT NULL, student_name CHAR(20), student_age INT, PRIMARY KEY (student_id));",
-        # 2. Valid table creation - departments table (for foreign key tests)
-        "CREATE TABLE departments (tmp int, dept_id INT NOT NULL, dept_name CHAR(20), PRIMARY KEY (dept_id));",
-        # 3. Valid table creation - employees table (needed for foreign key tests)
-        "CREATE TABLE employees (emp_id INT NOT NULL, emp_name CHAR(20), PRIMARY KEY (emp_id));",
-        # 4. Valid table creation - projects table (needed for foreign key tests)
-        "CREATE TABLE projects (proj_id INT NOT NULL, proj_name CHAR(20), PRIMARY KEY (proj_id));",
-        # 5. Column name duplication error - DuplicateColumnDefError
-        "CREATE TABLE duplicate_columns (id INT, id CHAR(10), PRIMARY KEY (id));",
-        # 6. Multiple primary key definitions error - DuplicatePrimaryKeyDefError
-        "CREATE TABLE multiple_pks (id INT, name CHAR(10), PRIMARY KEY (id), PRIMARY KEY (name));",
-        # 7. CHAR length less than 1 error - CharLengthError
-        "CREATE TABLE invalid_char_length (id INT, name CHAR(0));",
-        # 8. Non-existent column as primary key - PrimaryKeyColumnDefError
-        "CREATE TABLE non_existing_pk (id INT, name CHAR(10), PRIMARY KEY (age));",
-        # 9. Non-existent column as foreign key - ForeignKeyColumnDefError
-        "CREATE TABLE foreign_key_no_column (id INT, dept_id INT, FOREIGN KEY (non_existing_column) REFERENCES departments(dept_id));",
-        # 10. Foreign key references a non-existing table - ReferenceExistenceError
-        "CREATE TABLE foreign_key_no_table (id INT, dept_id INT, FOREIGN KEY (dept_id) REFERENCES nonexistent_table(id));",
-        # 11. Foreign key and referenced column have different types - ReferenceTypeError
-        "CREATE TABLE foreign_key_wrong_type (id INT, dept_id CHAR(10), FOREIGN KEY (dept_id) REFERENCES departments(dept_id));",
-        # 12. Foreign key references a non-primary key column - ReferenceNonPrimaryKeyError
-        "CREATE TABLE foreign_key_non_primary (id INT, dept_id INT, FOREIGN KEY (dept_id) REFERENCES departments(tmp));",
-        # 13. Foreign key references only part of a composite primary key - ReferenceNonPrimaryKeyError
-        "CREATE TABLE partial_composite_pk (id_one INT, id_two INT, description CHAR(20), PRIMARY KEY (id_one, id_two));",
-        "CREATE TABLE ref_partial_composite (fk_id_one INT, FOREIGN KEY (fk_id_one) REFERENCES partial_composite_pk(id_one));",
-        # 14. Attempt to create a table with an existing name - TableExistenceError
-        "CREATE TABLE students (student_id INT NOT NULL, student_name CHAR(20), student_age INT, PRIMARY KEY (student_id));",
-        # 15. Foreign key correctly references composite primary key
-        "CREATE TABLE complex_table (id_one INT NOT NULL, id_two INT NOT NULL, description CHAR(20), PRIMARY KEY (id_one, id_two));",
-        "CREATE TABLE ref_complex_table (fk_id_one INT, fk_id_two INT, FOREIGN KEY (fk_id_one, fk_id_two) REFERENCES complex_table(id_one, id_two));",
-        # 16. SHOW TABLES query
+        # 2. SHOW TABLES
         "SHOW TABLES;",
-        # 17. DESCRIBE students table
+        # 3. DESCRIBE students
         "DESCRIBE students;",
-        # Additional test queries to cover missing cases:
-        # 18. Foreign key references a non-existing column in the referenced table - ReferenceExistenceError
-        "CREATE TABLE fk_refs_nonexistent_column (id INT, dept_id INT, FOREIGN KEY (dept_id) REFERENCES departments(nonexistent_column));",
-        # 19. Foreign key and referenced column are both CHAR but with different lengths - ReferenceTypeError
-        "CREATE TABLE fk_char_length_mismatch (id INT, code CHAR(5), FOREIGN KEY (code) REFERENCES departments(dept_name));",
-        # 20. Valid table creation without specifying a primary key
-        "CREATE TABLE no_primary_key_table (id INT, name CHAR(20));",
-        # 21. Case-insensitive table and column names test
-        "CREATE TABLE case_insensitive_test (ID INT, Dept_ID INT, FOREIGN KEY (dept_id) REFERENCES DEPARTMENTS(Dept_ID));",
-        # 22. Table with multiple foreign keys (should be valid)
-        "CREATE TABLE employee_projects (employee_id INT, project_id INT, dept_id INT, FOREIGN KEY (employee_id) REFERENCES employees(emp_id), FOREIGN KEY (project_id) REFERENCES projects(proj_id));",
-        # 23. Foreign key column that allows NULL values (should be valid)
-        "CREATE TABLE nullable_fk (id INT, dept_id INT, FOREIGN KEY (dept_id) REFERENCES departments(dept_id));",
     ]
 
-    show_and_desc_table = [
-        "SHOW TABLES;",
-        "DESCRIBE students;",
-        "desc students;",
-        "explain students;",
-    ]
-
-    insert_into_table = [
-        # 'create table a (a int, b int);',
-        "insert into a(b, a) values(1, 2);"
-    ]
-
-    select_table = [
-        """CREATE TABLE students (
-            student_id INt,
-            name CHAR(50),
-            age INt,
-            major CHAR(30)
-        );""",
-        
-        """
-        INSERT INTO students (student_id, name, age, major) VALUES (1, 'Alice', 20, 'Computer Science');
-        INSERT INTO students (student_id, name, age, major) VALUES (2, 'Bob', 22, 'Mathematics');
-        INSERT INTO students (student_id, name, age, major) VALUES (3, 'Charlie', 21, 'Physics');
-        """
-        
-        "select * from students;",
-    ]
-
-    test_queries = select_table
+    test_queries = create_table_test_queries
 
     for idx, query in enumerate(test_queries):
         print(f"{idx}th: Running query: {query}")
@@ -659,33 +695,27 @@ def run_tests():
             transformer.transform(parsedQuery)
         except LarkError as e:
             print(e)
-            MessageHandler.print_error("SyntaxError")
+            MessageHandler.print_error(MessageKeys.SYNTAX_ERROR)
 
 
 def main_function():
     while True:
-
-        inputQuery: str = handleInput()
-
-        # Remove last element which is empty string due to last semicolon
+        inputQuery = handleInput()
         splittedQueries = inputQuery.split(";")[:-1]
-
-        # Parse and transform each query
-        # Break the loop if a LarkError occurs (syntax error)
         for query in splittedQueries:
             try:
                 parsedQuery = sql_parser.parse(query + ";")
                 transformer.transform(parsedQuery)
             except LarkError as e:
-                MessageHandler.print_error("SyntaxError")
+                MessageHandler.print_error(MessageKeys.SYNTAX_ERROR)
                 break
 
 
+# Run tests
 run_tests()
 
-database.print_fk_metadata()
+# Print foreign key metadata (if needed)
+# database.print_fk_metadata()
 
-# Main loop
-# Commented out for testing purposes
-
+# Main loop (Uncomment for interactive mode)
 main_function()

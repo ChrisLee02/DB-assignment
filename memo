@@ -1,0 +1,161 @@
+우선 해야 할 일을 나누는 것부터 시작해야 할 것 같아
+
+1. 디비 구현(데이터 저장 방식)을 어떻게 할지부터 생각하자.
+디비를 구성하는게 뭐뭐가 있냐라고 하면
+디비를 정의하는 DDL로 만들어지는 디비 스키마가 있구요
+DML을 통해 테이블에 저장되는 요소들을 관리할 테이블이 있겠죠
+
+
+테이블의 메타데이터를 저장하는 테이블이 필요하겠습니다.
+- 테이블 이름, 칼럼에 대한 정보(칼럼에 대한 integrity constraints까지)
+- 메타데이터 테이블은 적당한 prefix + 테이블명을 키로하고, 테이블명, 칼럼정보(이름, 타입, nullable), pk정보, fk정보 를 저장하면 될 것 같음.
+
+요소들을 저장할 '테이블'이 필요하겠죠
+- table을 prefix로 + 테이블명을 키로 하고, row들을 모아놓은 리스트로 관리하면 될 것 같음.
+
+키:리스트 방식으로 데이터를 저장하고, 파이썬의 리스트 내장 함수를 적극적으로 이용해서 성능보다는 코드의 생산성을 도모하자.
+
+2. 각 쿼리문을 구현하면 되겠죠?
+
+OOP를 적극적으로 도입하면 좋을 것 같음.
+쿼리를 파싱하는 것은 1-1에서 완성한 lark transformer로 처리하면 됨.
+
+우리가 추가로 구현할 부분은 DDL과 DML을 실제로 디비에 저장하는 과정
+- 파싱한 쿼리로부터 버클리DB에 접근, 바이너리 데이터를 역직렬화 데이터를 가공
+- 쿼리문의 종류에 따라서 데이터를 출력하거나, 수정/추가하여 다시 DB에 저장
+
+이 과정에서 OOP를 통해 코드를 모듈화하면 추후 수정에 용이할 것 같아. 
+1-2에서는 단순한 쿼리만 처리하지만, 1-3에선 join문이나 where절 같은 것들이 들어갈 것 같거든.
+
+타이핑: 
+column -> {'name': 'a', 'type': 'int', 'null': True}
+pk_constraints -> {'key_list': ['account_number', 'balance']}
+fk_constraints -> {'key_list': ['b'], 'other_key_list': ['other_column'], 'ref_table': 'other_table'}
+
+
+1. 중복된 에러 메시지 처리 로직 통합
+여러 함수에서 중복되는 에러 메시지 처리 부분이 있습니다. 예를 들어, 테이블이 없는 경우 NoSuchTable 에러를 처리하는 로직이 여러 번 사용되고 있습니다. 이를 함수로 추출하면 좋습니다.
+
+Refactoring Suggestion:
+
+python
+Copy code
+def handle_no_such_table(self, table_name, command_name):
+    if not self.db.get(f"table_schema:{table_name}".encode()):
+        MessageHandler.print_error("NoSuchTable", command_name=command_name)
+        return True
+    return False
+위와 같이 함수를 만들어 if self.handle_no_such_table(table_name, "Drop"): 형태로 중복 코드를 제거할 수 있습니다.
+
+2. 중복된 테이블 메타데이터 가져오기 로직 추출
+여러 함수에서 테이블 메타데이터를 가져와 사용하는 부분이 중복됩니다. 이를 함수로 추출하면 좋습니다.
+
+Refactoring Suggestion:
+
+python
+Copy code
+def get_table_metadata(self, table_name):
+    table_meta_data_serialized = self.db.get(f"table_schema:{table_name}".encode())
+    if not table_meta_data_serialized:
+        return None
+    return pickle.loads(table_meta_data_serialized)
+이 함수를 이용해 테이블 메타데이터를 간편하게 가져올 수 있게 됩니다.
+
+3. 반복되는 문자열 상수화
+다음과 같은 반복되는 문자열들을 상수화하면 유지보수가 쉬워집니다.
+
+"table_schema:"
+"foreign_key_metadata"
+"table_data:"
+Refactoring Suggestion:
+
+python
+Copy code
+TABLE_SCHEMA_PREFIX = "table_schema:"
+TABLE_DATA_PREFIX = "table_data:"
+FOREIGN_KEY_METADATA_KEY = "foreign_key_metadata"
+그리고 모든 코드에서 직접 문자열을 사용하는 대신 상수를 사용하는 것으로 변경하세요.
+
+4. Foreign Key 로직 단순화
+ForeignKeyMetadata 객체를 만드는 로직이 여러 군데에서 반복됩니다. 이 부분도 함수를 통해 간소화할 수 있습니다.
+
+Refactoring Suggestion:
+
+python
+Copy code
+def add_foreign_key_metadata(self, fk_constraints, table_name):
+    fk_metadata_list_data = self.db.get(FOREIGN_KEY_METADATA_KEY.encode())
+    fk_metadata_list = pickle.loads(fk_metadata_list_data) if fk_metadata_list_data else []
+    for fk in fk_constraints or []:
+        fk_metadata_list.append(
+            ForeignKeyMetadata(
+                table_name, fk["key_list"], fk["ref_table"], fk["other_key_list"]
+            )
+        )
+    self.db.put(FOREIGN_KEY_METADATA_KEY.encode(), pickle.dumps(fk_metadata_list))
+이렇게 하면 Foreign Key 관련 로직을 한 군데에서 관리할 수 있게 됩니다.
+
+5. 중복된 에러 체크 추출 및 재사용
+다양한 에러 체크가 자주 등장합니다. 이를 개별 함수로 추출하면 중복을 줄일 수 있습니다. 예를 들어, PrimaryKeyColumnDefError 나 ForeignKeyColumnDefError 관련 체크가 여러 번 등장합니다.
+
+Refactoring Suggestion:
+
+python
+Copy code
+def check_column_exists(self, column_name, column_names, error_message_type):
+    if column_name.lower() not in column_names:
+        MessageHandler.print_error(error_message_type, col_name=column_name)
+        return True
+    return False
+이와 같이 함수를 정의하고 에러 체크를 반복적으로 사용할 수 있게 합니다.
+
+6. Transformer 클래스의 중복된 쿼리 핸들링 코드 단순화
+Transformer 클래스에서 describe_query, explain_query, desc_query가 모두 동일한 동작을 수행합니다. 따라서 이들을 단일 함수로 바꾸고 그 함수를 호출하는 식으로 변경하면 코드가 더 깔끔해집니다.
+
+Refactoring Suggestion:
+
+python
+Copy code
+def handle_describe_query(self, items):
+    self.database.describe_table(items[1].children[0])
+
+# 기존 함수들 모두 handle_describe_query 호출
+def describe_query(self, items):
+    self.handle_describe_query(items)
+
+def explain_query(self, items):
+    self.handle_describe_query(items)
+
+def desc_query(self, items):
+    self.handle_describe_query(items)
+7. 중복된 출력 및 형식 정리 로직 추출
+데이터를 조회하여 출력할 때 사용하는 print 형식이 중복됩니다. 이러한 반복을 줄이기 위해 print_table과 같은 함수를 정의할 수 있습니다.
+
+Refactoring Suggestion:
+
+python
+Copy code
+def print_table(header, rows):
+    separator = "-" * len(header)
+    print(header)
+    print(separator)
+    for row in rows:
+        print(row)
+    print(separator)
+    print(f"{len(rows)} row in set" if len(rows) == 1 else f"{len(rows)} rows in set")
+이 함수를 이용하면 테이블 출력 로직을 훨씬 간단히 작성할 수 있습니다.
+
+8. 데이터 변환 로직 추출
+select_query와 같은 함수에서 INT 타입과 문자열 타입을 구분하여 파싱하고 변환하는 로직이 중복됩니다. 이러한 로직을 하나의 함수로 빼내어 재사용하면 좋습니다.
+
+Refactoring Suggestion:
+
+python
+Copy code
+def parse_value(tree_node):
+    if tree_node.type == "INT":
+        return int(tree_node.value)
+    return tree_node.value.strip("'\"")
+이 함수를 통해 모든 파싱 로직에서 값을 쉽게 변환할 수 있습니다.
+
+이러한 리팩토링을 통해 코드의 가독성, 재사용성, 유지보수성을 높일 수 있습니다. 추가적으로 필요하거나 함께 하고 싶은 리팩토링이 있으면 이야기해주세요!
