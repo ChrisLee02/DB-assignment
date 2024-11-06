@@ -159,7 +159,9 @@ class Database:
         table_name = table_name.lower()
 
         if not self.table_exists(table_name):
-            MessageHandler.print_error(MessageKeys.NO_SUCH_TABLE, command_name="Drop")
+            MessageHandler.print_error(
+                MessageKeys.NO_SUCH_TABLE, command_name="Drop table"
+            )
             return
 
         fk_metadata_list = self.get_foreign_key_metadata()

@@ -1,5 +1,7 @@
+import datetime
 from berkeleydb import db
 import pickle
+from error import ColumnNotFoundError, IncomparableTypeError
 from messages import MessageHandler, MessageKeys
 from metadata import TableMetadata, ForeignKeyMetadata
 from formatter import Formatter
@@ -159,7 +161,9 @@ class Database:
         table_name = table_name.lower()
 
         if not self.table_exists(table_name):
-            MessageHandler.print_error(MessageKeys.NO_SUCH_TABLE, command_name="Drop")
+            MessageHandler.print_error(
+                MessageKeys.NO_SUCH_TABLE, command_name="Drop table"
+            )
             return
 
         fk_metadata_list = self.get_foreign_key_metadata()
@@ -237,6 +241,15 @@ class Database:
     def insert_into_table(
         self, table_name: str, values: list, column_sequence: list = None
     ):
+        # 에러처리
+        # case 1. column_sequence가 주어진 경우
+        # -> 컬럼과 값의 개수가 다른 경우 InsertTypeMismatchError
+        # -> 지정된 컬럼과 값의 타입이 맞지 않는 경우 InsertTypeMismatchError
+        # -> 칼럼에 명시되지 않은 값들은 null로 들어가는데, 이때 InsertColumnNonNullableError 처리
+
+        # case 2. column_sequence가 없는 경우
+        # -> 개수비교해서 다르면 InsertTypeMismatchError
+
         table_name = table_name.lower()
         table_metadata: TableMetadata = self.get_table_metadata(table_name)
         if not table_metadata:
@@ -249,21 +262,82 @@ class Database:
         rows: list = self.get_table_data(table_name) or []
         row = dict()
 
+        column_sequence_from_metadata = [columns_dict[i]["name"] for i in columns_dict]
+
         # if only values received, use schema's column sequence.
         if column_sequence is None:
-            column_sequence = [columns_dict[i]["name"] for i in columns_dict]
+            column_sequence = column_sequence_from_metadata
 
-        for idx, column_name in enumerate(column_sequence):
-            type_str: str = table_metadata.get_column(column_name)["type"]
+        # check cardinality of values with columns
+        if len(column_sequence) != len(values):
+            MessageHandler.print_error(MessageKeys.INSERT_TYPE_MISMATCH_ERROR)
+            return
+
+        # todo: 타입 맞는지 확인 후 InsertTypeMismatchError,
+        # todo: 존재하지 않는 column에 값을 삽입하는 경우 InsertColumnExistenceError
+        for idx, col_name in enumerate(column_sequence):
+            col = table_metadata.get_column(col_name)
+            if not col:
+                MessageHandler.print_error(
+                    MessageKeys.INSERT_COLUMN_EXISTENCE_ERROR, col_name=col_name
+                )
+                return
+            type_str: str = col["type"]
+            col_not_null: bool = col["not_null"]
             value = values[idx]
-            if isinstance(value, str) and value.lower() == "null":
-                row[column_name] = "null"
-            elif type_str.startswith("char"):
-                char_length = int(type_str[5:-1])
-                row[column_name] = value[:char_length]
-            else:
-                row[column_name] = value
 
+            # 타입체크를 해야함.
+            # case: value 값이 null인 경우와, 그렇지 않은 경우로 나눈다.
+            if isinstance(value, str) and value.lower() == "null":
+                if col_not_null:
+                    MessageHandler.print_error(
+                        MessageKeys.INSERT_COLUMN_NON_NULLABLE_ERROR, col_name=col_name
+                    )
+                    return
+                row[col_name] = "null"
+                row[f"{table_name}.{col_name}"] = "null"
+            else:
+                if type_str.startswith("char"):
+                    if not isinstance(value, str):
+                        MessageHandler.print_error(
+                            MessageKeys.INSERT_TYPE_MISMATCH_ERROR
+                        )
+                        return
+
+                    char_length = int(type_str[5:-1])
+                    row[col_name] = value[:char_length].ljust(char_length)
+                    row[f"{table_name}.{col_name}"] = value[:char_length].ljust(char_length)
+                elif type_str == "date":
+                    try:
+                        parsed_date = datetime.datetime.strptime(value, "%Y-%m-%d")
+                        row[col_name] = parsed_date.strftime("%Y-%m-%d")
+                        row[f"{table_name}.{col_name}"] = parsed_date.strftime("%Y-%m-%d")
+                    except ValueError:
+                        MessageHandler.print_error(
+                            MessageKeys.INSERT_TYPE_MISMATCH_ERROR
+                        )
+                        return
+                else:
+                    if not isinstance(value, int):
+                        MessageHandler.print_error(
+                            MessageKeys.INSERT_TYPE_MISMATCH_ERROR
+                        )
+                        return
+                    row[col_name] = value
+                    row[f"{table_name}.{col_name}"] = value
+
+
+        # todo: column_sequence_from_metadata - column_sequence에 해당하는 값들 처리
+        # todo: 기본값이 따로 없으므로 null로 삽입하고, 이때 nullable을 체크해서
+        for col_name in column_sequence_from_metadata:
+            if col_name not in column_sequence:
+                col_meta = columns_dict[col_name]
+                if col_meta["not_null"]:
+                    MessageHandler.print_error(
+                        MessageKeys.INSERT_COLUMN_NON_NULLABLE_ERROR, col_name=col_name
+                    )
+                    return
+                row[col_name] = "null"
         rows.append(row)
         self.put_table_data(table_name, rows)
         MessageHandler.print_success(MessageKeys.INSERT_RESULT)
@@ -280,17 +354,66 @@ class Database:
             return
 
         columns_dict = table_metadata.columns
-        column_name_list = [columns_dict[i]["name"] for i in columns_dict]
+        column_name_list = [f"{table_name}.{columns_dict[i]['name']}" for i in columns_dict]
         rows_data: list = self.get_table_data(table_name) or []
-        headers = column_name_list
+
+        # Prepare headers
+        headers = [col_name.split('.', 1)[-1] for col_name in column_name_list]  # Header는 컬럼 이름만 출력
         rows = []
+
         for row_data in rows_data:
             row = [str(row_data.get(col_name, "NULL")) for col_name in column_name_list]
             rows.append(row)
 
+        # Formatting table to display
         table_str = Formatter.format_table(headers, rows)
         footer = Formatter.format_footer(len(rows))
         print("\n".join([table_str, footer]))
+
+
+    def delete_from_table(self, table_name: str, condition):
+        try:
+            table_name = table_name.lower()
+            table_metadata = self.get_table_metadata(table_name)
+            if not table_metadata:
+                MessageHandler.print_error(
+                    MessageKeys.NO_SUCH_TABLE, command_name="Delete from"
+                )
+                return
+
+            rows = self.get_table_data(table_name) or []
+
+            # If condition is None, delete all rows
+            if condition is None:
+                deleted_count = len(rows)
+                rows = []
+            else:
+                # Delete rows that satisfy the condition
+                new_rows = []
+                deleted_count = 0
+                for row in rows:
+                    if not condition(row):
+                        new_rows.append(row)
+                    else:
+                        deleted_count += 1
+                rows = new_rows
+
+            # Update table with new rows
+            self.put_table_data(table_name, rows)
+
+            # Success message with correct count handling
+            count_message = (
+                f"{deleted_count} row deleted" if deleted_count == 1 else f"{deleted_count} rows deleted"
+            )
+            MessageHandler.print_success(MessageKeys.DELETE_RESULT, count=count_message)
+
+        except ColumnNotFoundError:
+            MessageHandler.print_error(MessageKeys.COLUMN_NOT_EXIST, clause_name="DELETE")
+        except IncomparableTypeError:
+            MessageHandler.print_error(MessageKeys.INCOMPARABLE_ERROR, clause_name="DELETE")
+        except Exception as e:
+            MessageHandler.print_error(f"Unhandled error: {str(e)}")
+
 
     def close(self):
         self.db.close()

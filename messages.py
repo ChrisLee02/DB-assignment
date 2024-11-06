@@ -18,6 +18,16 @@ class MessageKeys:
     CREATE_TABLE_SUCCESS = "CreateTableSuccess"
     DROP_SUCCESS = "DropSuccess"
     INSERT_RESULT = "InsertResult"
+    INSERT_TYPE_MISMATCH_ERROR = "InsertTypeMismatchError"
+    INSERT_COLUMN_EXISTENCE_ERROR = "InsertColumnExistenceError"
+    INSERT_COLUMN_NON_NULLABLE_ERROR = "InsertColumnNonNullableError"
+    DELETE_RESULT = "DeleteResult"
+    SELECT_COLUMN_RESOLVE_ERROR = "SelectColumnResolveError"
+    SELECT_COLUMN_NOT_GROUPED = "SelectColumnNotGrouped"
+    TABLE_NOT_SPECIFIED = "TableNotSpecified"
+    COLUMN_NOT_EXIST = "ColumnNotExist"
+    AMBIGUOUS_REFERENCE = "AmbiguousReference"
+    INCOMPARABLE_ERROR = "IncomparableError"
 
 
 class MessageValues:
@@ -48,7 +58,19 @@ class MessageValues:
     SELECT_TABLE_EXISTENCE_ERROR = "Select has failed: '{table_name}' does not exist"
     CREATE_TABLE_SUCCESS = "{table_name} table is created"
     DROP_SUCCESS = "{table_name} table is dropped"
-    INSERT_RESULT = "The row is inserted"
+    INSERT_RESULT = "1 row inserted"
+    INSERT_TYPE_MISMATCH_ERROR = "Insert has failed: types are not matched"
+    INSERT_COLUMN_EXISTENCE_ERROR = "Insert has failed: '{col_name}' does not exist"
+    INSERT_COLUMN_NON_NULLABLE_ERROR = "Insert has failed: '{col_name}' is not nullable"
+    DELETE_RESULT = lambda count: f"{count} row deleted" if count == 1 else f"{count} rows deleted"
+    SELECT_COLUMN_RESOLVE_ERROR = "Select has failed: fail to resolve '{col_name}'"
+    SELECT_COLUMN_NOT_GROUPED = "Select has failed: column '{col_name}' must either be included in the GROUP BY clause or be used in an aggregate function"
+    TABLE_NOT_SPECIFIED = (
+        "{clause_name} clause trying to reference tables which are not specified"
+    )
+    COLUMN_NOT_EXIST = "{clause_name} clause trying to reference non existing column"
+    AMBIGUOUS_REFERENCE = "{clause_name} clause contains ambiguous column reference"
+    INCOMPARABLE_ERROR = "Trying to compare incomparable columns or values"
 
 
 class MessageHandler:
@@ -68,6 +90,15 @@ class MessageHandler:
             MessageKeys.NO_SUCH_TABLE: MessageValues.NO_SUCH_TABLE,
             MessageKeys.DROP_REFERENCED_TABLE_ERROR: MessageValues.DROP_REFERENCED_TABLE_ERROR,
             MessageKeys.SELECT_TABLE_EXISTENCE_ERROR: MessageValues.SELECT_TABLE_EXISTENCE_ERROR,
+            MessageKeys.INSERT_TYPE_MISMATCH_ERROR: MessageValues.INSERT_TYPE_MISMATCH_ERROR,
+            MessageKeys.INSERT_COLUMN_EXISTENCE_ERROR: MessageValues.INSERT_COLUMN_EXISTENCE_ERROR,
+            MessageKeys.INSERT_COLUMN_NON_NULLABLE_ERROR: MessageValues.INSERT_COLUMN_NON_NULLABLE_ERROR,
+            MessageKeys.SELECT_COLUMN_RESOLVE_ERROR: MessageValues.SELECT_COLUMN_RESOLVE_ERROR,
+            MessageKeys.SELECT_COLUMN_NOT_GROUPED: MessageValues.SELECT_COLUMN_NOT_GROUPED,
+            MessageKeys.TABLE_NOT_SPECIFIED: MessageValues.TABLE_NOT_SPECIFIED,
+            MessageKeys.COLUMN_NOT_EXIST: MessageValues.COLUMN_NOT_EXIST,
+            MessageKeys.AMBIGUOUS_REFERENCE: MessageValues.AMBIGUOUS_REFERENCE,
+            MessageKeys.INCOMPARABLE_ERROR: MessageValues.INCOMPARABLE_ERROR,
         }
         message_template = messages.get(message_type, "Unknown error")
         try:
@@ -86,10 +117,15 @@ class MessageHandler:
             MessageKeys.CREATE_TABLE_SUCCESS: MessageValues.CREATE_TABLE_SUCCESS,
             MessageKeys.DROP_SUCCESS: MessageValues.DROP_SUCCESS,
             MessageKeys.INSERT_RESULT: MessageValues.INSERT_RESULT,
+            MessageKeys.DELETE_RESULT: MessageValues.DELETE_RESULT,
         }
         message_template = messages.get(message_type, "Unknown message")
+
         try:
-            message = message_template.format(**kwargs)
+            if callable(message_template):
+                message = message_template(**kwargs)
+            else:
+                message = message_template.format(**kwargs)
         except KeyError as e:
             missing_key = e.args[0]
             print(

@@ -132,12 +132,24 @@ def run_tests():
     # Scenario 3: Nullable Column Test
     nullable_column_test = [
         "CREATE TABLE nullable_table (id INT, name CHAR(20), PRIMARY KEY (id));",
+        "INSERT INTO nullable_table (name) VALUES ('hi');",  # Insert with NULL value
+        "INSERT INTO nullable_table (dltkqf) VALUES ('hi');",  # Insert with NULL value
         "INSERT INTO nullable_table (id, name) VALUES (1, NULL);",  # Insert with NULL value
         "INSERT INTO nullable_table (id, name) VALUES (1, null);",  # Insert with NULL value
         "INSERT INTO nullable_table (id, name) VALUES (1, NuLl);",  # Insert with NULL value
         "INSERT INTO nullable_table (id, name) VALUES (2, 'TestName');",  # Insert without NULL value
         "SELECT * FROM nullable_table;",  # Verify both rows are correctly inserted
     ]
+
+    # delete test
+    delete_test = [
+        "create table a (b int);",
+        "insert into a values(1);",
+        "delete from a where b = 0;",
+        "delete from a where a.b = 0;",
+    ]
+
+
 
     # 테스트 케이스 리스트 업데이트
     test_cases = [
@@ -150,23 +162,37 @@ def run_tests():
         nullable_column_test,
     ]
 
-    for test_queries in test_cases:
-        for idx, query in enumerate(test_queries):
-            database = Database()
-            transformer = MyTransformer(database)
-            print("=====================================")
-            print(f"{idx + 1}th: Running query: {query}")
-            try:
-                parsedQuery = sql_parser.parse(query)
-                transformer.transform(parsedQuery)
-            except LarkError as e:
-                print(e)
-                MessageHandler.print_error(MessageKeys.SYNTAX_ERROR)
-            print("=====================================")
+    # for test_queries in test_cases:
+    #     for idx, query in enumerate(test_queries):
+    #         database = Database()
+    #         transformer = MyTransformer(database)
+    #         print("=====================================")
+    #         print(f"{idx + 1}th: Running query: {query}")
+    #         try:
+    #             parsedQuery = sql_parser.parse(query)
+    #             transformer.transform(parsedQuery)
+    #         except LarkError as e:
+    #             print(e)
+    #             MessageHandler.print_error(MessageKeys.SYNTAX_ERROR)
+    #         print("=====================================")
 
-        database.close()
-        os.remove("myDB.db")  # 파일 삭제
-        print("Database reset: DB file removed.")
-
+    #     database.close()
+    #     os.remove("myDB.db")  # 파일 삭제
+    #     print("Database reset: DB file removed.")
+    for idx, query in enumerate(delete_test):
+        database = Database()
+        transformer = MyTransformer(database)
+        print("=====================================")
+        print(f"{idx + 1}th: Running query: {query}")
+        try:
+            parsedQuery = sql_parser.parse(query)
+            transformer.transform(parsedQuery)
+        except LarkError as e:
+            print(e)
+            MessageHandler.print_error(MessageKeys.SYNTAX_ERROR)
+        print("=====================================")
+    database.close()
+    os.remove("myDB.db")  # 파일 삭제
+    print("Database reset: DB file removed.")
 
 run_tests()

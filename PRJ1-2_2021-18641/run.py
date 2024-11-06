@@ -30,6 +30,7 @@ def handleInput():
 
     return " ".join(multi_lines)
 
+
 # Main loop
 # Receive input query(queries) and split each query into list for executing
 while True:
@@ -37,7 +38,7 @@ while True:
 
     # Remove last element which is empty string due to last semicolon
     splittedQueries = inputQuery.split(";")[:-1]
-    
+
     # Parse and transform each query
     # Break the loop if a LarkError occurs (syntax error)
     for query in splittedQueries:
