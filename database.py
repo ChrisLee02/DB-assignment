@@ -1,10 +1,23 @@
 import datetime
 from berkeleydb import db
 import pickle
-from error import ColumnNotFoundError, IncomparableTypeError
+from utils import (
+    AmbiguousReference,
+    BooleanCondition,
+    ColumnNotFoundError,
+    ColumnReference,
+    Condition,
+    IncomparableTypeError,
+    LiteralValue,
+    NullCondition,
+    TableNotSpecified,
+    evaluate_condition,
+    get_value,
+)
 from messages import MessageHandler, MessageKeys
 from metadata import TableMetadata, ForeignKeyMetadata
 from formatter import Formatter
+from itertools import product
 
 
 class Database:
@@ -17,7 +30,9 @@ class Database:
         table_meta_data_serialized = self.db.get(f"table_schema:{table_name}".encode())
         if not table_meta_data_serialized:
             return None
-        return pickle.loads(table_meta_data_serialized)
+
+        table_meta_data: TableMetadata = pickle.loads(table_meta_data_serialized)
+        return table_meta_data
 
     def put_table_metadata(self, table_name, table_metadata):
         self.db.put(f"table_schema:{table_name}".encode(), pickle.dumps(table_metadata))
@@ -249,7 +264,6 @@ class Database:
 
         # case 2. column_sequence가 없는 경우
         # -> 개수비교해서 다르면 InsertTypeMismatchError
-
         table_name = table_name.lower()
         table_metadata: TableMetadata = self.get_table_metadata(table_name)
         if not table_metadata:
@@ -273,8 +287,6 @@ class Database:
             MessageHandler.print_error(MessageKeys.INSERT_TYPE_MISMATCH_ERROR)
             return
 
-        # todo: 타입 맞는지 확인 후 InsertTypeMismatchError,
-        # todo: 존재하지 않는 column에 값을 삽입하는 경우 InsertColumnExistenceError
         for idx, col_name in enumerate(column_sequence):
             col = table_metadata.get_column(col_name)
             if not col:
@@ -294,8 +306,8 @@ class Database:
                         MessageKeys.INSERT_COLUMN_NON_NULLABLE_ERROR, col_name=col_name
                     )
                     return
-                row[col_name] = "null"
-                row[f"{table_name}.{col_name}"] = "null"
+                # row[col_name] = "null"
+                row[f"{table_name}.{col_name}"] = None
             else:
                 if type_str.startswith("char"):
                     if not isinstance(value, str):
@@ -305,13 +317,15 @@ class Database:
                         return
 
                     char_length = int(type_str[5:-1])
-                    row[col_name] = value[:char_length].ljust(char_length)
-                    row[f"{table_name}.{col_name}"] = value[:char_length].ljust(char_length)
+                    # row[col_name] = value[:char_length].ljust(char_length)
+                    row[f"{table_name}.{col_name}"] = value[:char_length].ljust(
+                        char_length
+                    )
                 elif type_str == "date":
                     try:
                         parsed_date = datetime.datetime.strptime(value, "%Y-%m-%d")
-                        row[col_name] = parsed_date.strftime("%Y-%m-%d")
-                        row[f"{table_name}.{col_name}"] = parsed_date.strftime("%Y-%m-%d")
+                        # row[col_name] = parsed_date.strftime("%Y-%m-%d")
+                        row[f"{table_name}.{col_name}"] = parsed_date
                     except ValueError:
                         MessageHandler.print_error(
                             MessageKeys.INSERT_TYPE_MISMATCH_ERROR
@@ -323,12 +337,9 @@ class Database:
                             MessageKeys.INSERT_TYPE_MISMATCH_ERROR
                         )
                         return
-                    row[col_name] = value
+                    # row[col_name] = value
                     row[f"{table_name}.{col_name}"] = value
 
-
-        # todo: column_sequence_from_metadata - column_sequence에 해당하는 값들 처리
-        # todo: 기본값이 따로 없으므로 null로 삽입하고, 이때 nullable을 체크해서
         for col_name in column_sequence_from_metadata:
             if col_name not in column_sequence:
                 col_meta = columns_dict[col_name]
@@ -337,44 +348,153 @@ class Database:
                         MessageKeys.INSERT_COLUMN_NON_NULLABLE_ERROR, col_name=col_name
                     )
                     return
-                row[col_name] = "null"
+                row[col_name] = None
         rows.append(row)
         self.put_table_data(table_name, rows)
         MessageHandler.print_success(MessageKeys.INSERT_RESULT)
 
-    def select_from_table(self, table_name: str):
-        table_name = table_name.lower()
+    def select_from_table(
+        self,
+        select_list: list[ColumnReference],
+        referred_tables: list[str],
+        join_conditions: list[Condition],
+        where_condition,
+        order_by_column: str,
+        order_by_direction: str,
+    ):
+        try:
+            table_metadata_list = {
+                table_name: self.get_table_metadata(table_name.lower())
+                for table_name in referred_tables
+            }
+            for table_name, metadata in table_metadata_list.items():
+                if not metadata:
+                    MessageHandler.print_error(
+                        MessageKeys.SELECT_TABLE_EXISTENCE_ERROR, table_name=table_name
+                    )
+                    return
 
-        table_metadata: TableMetadata = self.get_table_metadata(table_name)
+            if not select_list:
+                select_list = []
+                for table_name, metadata in table_metadata_list.items():
+                    select_list.extend(
+                        ColumnReference(table=table_name, column=col["name"])
+                        for col in metadata.columns.values()
+                    )
 
-        if not table_metadata:
-            MessageHandler.print_error(
-                MessageKeys.SELECT_TABLE_EXISTENCE_ERROR, table_name=table_name
+            table_dummy_data_row = {}
+            for table_meta in table_metadata_list.values():
+                table_dummy_data_row = {
+                    **table_dummy_data_row,
+                    **table_meta.get_dummy_row(),
+                }
+
+            # dummy를 활용해 select_list, join where condition을 검증
+            for i in select_list:
+                get_value(i, table_dummy_data_row, referred_tables)
+
+            for i in join_conditions:
+                evaluate_condition(i, table_dummy_data_row, referred_tables)
+
+            evaluate_condition(where_condition, table_dummy_data_row, referred_tables)
+
+            table_data_list = {
+                table_name: self.get_table_data(table_name.lower())
+                for table_name in referred_tables
+            }
+
+            """ for col_ref in select_list:
+                if col_ref.table is not None:
+                    if col_ref.table not in referred_tables:
+                        raise TableNotSpecified
+                    table_meta = table_metadata_list[col_ref.table]
+                    matching_columns = list(
+                        filter(lambda col: col_ref.column == col["name"], table_meta.columns.values())
+                    )
+                    if len(matching_columns) == 0:
+                        raise ColumnNotFoundError
+                else:
+                    matching_columns = [
+                        col["name"]
+                        for table_meta in table_metadata_list.values()
+                        for col in table_meta.columns.values()
+                        if col_ref.column == col["name"]
+                    ]
+                    if len(matching_columns) == 0:
+                        raise ColumnNotFoundError
+                    elif len(matching_columns) > 1:
+                        raise AmbiguousReference """
+
+            # print([str(i) for i in select_list])
+            rows = table_data_list[referred_tables[0]]
+            if len(referred_tables) > 1:
+                rows = [
+                    {**row_a, **row_b}
+                    for table_pair in product(*table_data_list.values())
+                    for row_a, row_b in [table_pair]
+                ]
+
+            # print(rows)
+
+            # join
+
+            new_rows = []
+            for row in rows:
+                result = [
+                    evaluate_condition(con, row, referred_tables)
+                    for con in join_conditions
+                ]
+                if all(result):
+                    new_rows.append(row)
+            rows = new_rows
+
+            new_rows = []
+            for row in rows:
+                if evaluate_condition(where_condition, row, referred_tables):
+                    new_rows.append(row)
+            rows = new_rows
+
+            if order_by_column is not None:
+                # column 유효성 검증
+                get_value(
+                    ColumnReference(None, order_by_column),
+                    table_dummy_data_row,
+                    referred_tables,
+                )
+                rows.sort(
+                    key=lambda row: get_value(
+                        ColumnReference(None, order_by_column),
+                        row,
+                        referred_tables,
+                    ),
+                    reverse=(order_by_direction == "desc"),
+                )
+
+            # Formatting table to display
+            table_str = Formatter.format_table_select(
+                select_list, rows, referred_tables
             )
-            return
-
-        columns_dict = table_metadata.columns
-        column_name_list = [f"{table_name}.{columns_dict[i]['name']}" for i in columns_dict]
-        rows_data: list = self.get_table_data(table_name) or []
-
-        # Prepare headers
-        headers = [col_name.split('.', 1)[-1] for col_name in column_name_list]  # Header는 컬럼 이름만 출력
-        rows = []
-
-        for row_data in rows_data:
-            row = [str(row_data.get(col_name, "NULL")) for col_name in column_name_list]
-            rows.append(row)
-
-        # Formatting table to display
-        table_str = Formatter.format_table(headers, rows)
-        footer = Formatter.format_footer(len(rows))
-        print("\n".join([table_str, footer]))
-
+            footer = Formatter.format_footer(len(rows))
+            print("\n".join([table_str, footer]))
+        except ColumnNotFoundError:
+            MessageHandler.print_error(
+                MessageKeys.COLUMN_NOT_EXIST, clause_name="SELECT"
+            )
+        except IncomparableTypeError:
+            MessageHandler.print_error(MessageKeys.INCOMPARABLE_ERROR)
+        except TableNotSpecified:
+            MessageHandler.print_error(
+                MessageKeys.TABLE_NOT_SPECIFIED, clause_name="SELECT"
+            )
+        except AmbiguousReference:
+            MessageHandler.print_error(
+                MessageKeys.AMBIGUOUS_REFERENCE, clause_name="SELECT"
+            )
 
     def delete_from_table(self, table_name: str, condition):
         try:
             table_name = table_name.lower()
-            table_metadata = self.get_table_metadata(table_name)
+            table_metadata: TableMetadata = self.get_table_metadata(table_name)
             if not table_metadata:
                 MessageHandler.print_error(
                     MessageKeys.NO_SUCH_TABLE, command_name="Delete from"
@@ -388,11 +508,16 @@ class Database:
                 deleted_count = len(rows)
                 rows = []
             else:
+                # Use dummy row in metadata to check incomparability when table is empty
+                evaluate_condition(
+                    condition, table_metadata.get_dummy_row(), [table_name]
+                )
+
                 # Delete rows that satisfy the condition
                 new_rows = []
                 deleted_count = 0
                 for row in rows:
-                    if not condition(row):
+                    if not evaluate_condition(condition, row, [table_name]):
                         new_rows.append(row)
                     else:
                         deleted_count += 1
@@ -402,18 +527,22 @@ class Database:
             self.put_table_data(table_name, rows)
 
             # Success message with correct count handling
-            count_message = (
-                f"{deleted_count} row deleted" if deleted_count == 1 else f"{deleted_count} rows deleted"
-            )
-            MessageHandler.print_success(MessageKeys.DELETE_RESULT, count=count_message)
+            MessageHandler.print_success(MessageKeys.DELETE_RESULT, count=deleted_count)
 
         except ColumnNotFoundError:
-            MessageHandler.print_error(MessageKeys.COLUMN_NOT_EXIST, clause_name="DELETE")
+            MessageHandler.print_error(
+                MessageKeys.COLUMN_NOT_EXIST, clause_name="DELETE"
+            )
         except IncomparableTypeError:
-            MessageHandler.print_error(MessageKeys.INCOMPARABLE_ERROR, clause_name="DELETE")
-        except Exception as e:
-            MessageHandler.print_error(f"Unhandled error: {str(e)}")
-
+            MessageHandler.print_error(MessageKeys.INCOMPARABLE_ERROR)
+        except TableNotSpecified:
+            MessageHandler.print_error(
+                MessageKeys.TABLE_NOT_SPECIFIED, clause_name="DELETE"
+            )
+        except AmbiguousReference:
+            MessageHandler.print_error(
+                MessageKeys.AMBIGUOUS_REFERENCE, clause_name="DELETE"
+            )
 
     def close(self):
         self.db.close()

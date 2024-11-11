@@ -31,46 +31,54 @@ class MessageKeys:
 
 
 class MessageValues:
-    SYNTAX_ERROR = "Syntax error"
+    SYNTAX_ERROR = "DB_2021-18641> Syntax error"
     DUPLICATE_COLUMN_DEF_ERROR = (
-        "Create table has failed: column definition is duplicated"
+        "DB_2021-18641> Create table has failed: column definition is duplicated"
     )
     DUPLICATE_PRIMARY_KEY_DEF_ERROR = (
-        "Create table has failed: primary key definition is duplicated"
+        "DB_2021-18641> Create table has failed: primary key definition is duplicated"
     )
-    REFERENCE_TYPE_ERROR = "Create table has failed: foreign key references wrong type"
-    REFERENCE_NON_PRIMARY_KEY_ERROR = (
-        "Create table has failed: foreign key references non primary key column"
+    REFERENCE_TYPE_ERROR = (
+        "DB_2021-18641> Create table has failed: foreign key references wrong type"
     )
-    REFERENCE_EXISTENCE_ERROR = (
-        "Create table has failed: foreign key references non existing table or column"
+    REFERENCE_NON_PRIMARY_KEY_ERROR = "DB_2021-18641> Create table has failed: foreign key references non primary key column"
+    REFERENCE_EXISTENCE_ERROR = "DB_2021-18641> Create table has failed: foreign key references non existing table or column"
+    PRIMARY_KEY_COLUMN_DEF_ERROR = "DB_2021-18641> Create table has failed: cannot define non-existing column '{col_name}' as primary key"
+    FOREIGN_KEY_COLUMN_DEF_ERROR = "DB_2021-18641> Create table has failed: cannot define non-existing column '{col_name}' as foreign key"
+    TABLE_EXISTENCE_ERROR = "DB_2021-18641> Create table has failed: table with the same name already exists"
+    CHAR_LENGTH_ERROR = "DB_2021-18641> Char length should be over 0"
+    NO_SUCH_TABLE = "DB_2021-18641> {command_name} has failed: no such table"
+    DROP_REFERENCED_TABLE_ERROR = "DB_2021-18641> Drop table has failed: '{table_name}' is referenced by another table"
+    SELECT_TABLE_EXISTENCE_ERROR = (
+        "DB_2021-18641> Select has failed: '{table_name}' does not exist"
     )
-    PRIMARY_KEY_COLUMN_DEF_ERROR = "Create table has failed: cannot define non-existing column '{col_name}' as primary key"
-    FOREIGN_KEY_COLUMN_DEF_ERROR = "Create table has failed: cannot define non-existing column '{col_name}' as foreign key"
-    TABLE_EXISTENCE_ERROR = (
-        "Create table has failed: table with the same name already exists"
+    CREATE_TABLE_SUCCESS = "DB_2021-18641> {table_name} table is created"
+    DROP_SUCCESS = "DB_2021-18641> {table_name} table is dropped"
+    INSERT_RESULT = "DB_2021-18641> 1 row inserted"
+    INSERT_TYPE_MISMATCH_ERROR = (
+        "DB_2021-18641> Insert has failed: types are not matched"
     )
-    CHAR_LENGTH_ERROR = "Char length should be over 0"
-    NO_SUCH_TABLE = "{command_name} has failed: no such table"
-    DROP_REFERENCED_TABLE_ERROR = (
-        "Drop table has failed: '{table_name}' is referenced by another table"
+    INSERT_COLUMN_EXISTENCE_ERROR = (
+        "DB_2021-18641> Insert has failed: '{col_name}' does not exist"
     )
-    SELECT_TABLE_EXISTENCE_ERROR = "Select has failed: '{table_name}' does not exist"
-    CREATE_TABLE_SUCCESS = "{table_name} table is created"
-    DROP_SUCCESS = "{table_name} table is dropped"
-    INSERT_RESULT = "1 row inserted"
-    INSERT_TYPE_MISMATCH_ERROR = "Insert has failed: types are not matched"
-    INSERT_COLUMN_EXISTENCE_ERROR = "Insert has failed: '{col_name}' does not exist"
-    INSERT_COLUMN_NON_NULLABLE_ERROR = "Insert has failed: '{col_name}' is not nullable"
-    DELETE_RESULT = lambda count: f"{count} row deleted" if count == 1 else f"{count} rows deleted"
-    SELECT_COLUMN_RESOLVE_ERROR = "Select has failed: fail to resolve '{col_name}'"
-    SELECT_COLUMN_NOT_GROUPED = "Select has failed: column '{col_name}' must either be included in the GROUP BY clause or be used in an aggregate function"
-    TABLE_NOT_SPECIFIED = (
-        "{clause_name} clause trying to reference tables which are not specified"
+    INSERT_COLUMN_NON_NULLABLE_ERROR = (
+        "DB_2021-18641> Insert has failed: '{col_name}' is not nullable"
     )
-    COLUMN_NOT_EXIST = "{clause_name} clause trying to reference non existing column"
-    AMBIGUOUS_REFERENCE = "{clause_name} clause contains ambiguous column reference"
-    INCOMPARABLE_ERROR = "Trying to compare incomparable columns or values"
+    DELETE_RESULT = "DB_2021-18641> {count} row(s) deleted"
+    SELECT_COLUMN_RESOLVE_ERROR = (
+        "DB_2021-18641> Select has failed: fail to resolve '{col_name}'"
+    )
+    SELECT_COLUMN_NOT_GROUPED = "DB_2021-18641> Select has failed: column '{col_name}' must either be included in the GROUP BY clause or be used in an aggregate function"
+    TABLE_NOT_SPECIFIED = "DB_2021-18641> {clause_name} clause trying to reference tables which are not specified"
+    COLUMN_NOT_EXIST = (
+        "DB_2021-18641> {clause_name} clause trying to reference non existing column"
+    )
+    AMBIGUOUS_REFERENCE = (
+        "DB_2021-18641> {clause_name} clause contains ambiguous column reference"
+    )
+    INCOMPARABLE_ERROR = (
+        "DB_2021-18641> Trying to compare incomparable columns or values"
+    )
 
 
 class MessageHandler:
@@ -120,12 +128,8 @@ class MessageHandler:
             MessageKeys.DELETE_RESULT: MessageValues.DELETE_RESULT,
         }
         message_template = messages.get(message_type, "Unknown message")
-
         try:
-            if callable(message_template):
-                message = message_template(**kwargs)
-            else:
-                message = message_template.format(**kwargs)
+            message = message_template.format(**kwargs)
         except KeyError as e:
             missing_key = e.args[0]
             print(

@@ -46,5 +46,6 @@ while True:
             parsedQuery = sql_parser.parse(query + ";")
             transformer.transform(parsedQuery)
         except LarkError as e:
+            print(e)
             MessageHandler.print_error(MessageKeys.SYNTAX_ERROR)
             break

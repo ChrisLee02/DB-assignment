@@ -55,12 +55,6 @@ SET: "set"i
 DESCRIBE: "describe"i
 EXPLAIN: "explain"i
 UPDATE: "update"i
-JOIN: "join"i
-ON: "on"i
-ORDER: "order"i
-BY: "by"i
-ASC: "asc"i
-
 
 // QUERY
 command : query_list 
@@ -107,13 +101,14 @@ show_tables_query: SHOW TABLES -> show_tables_query
 
 
 // SELECT
-select_query : SELECT select_list from_clause [join_clause] [where_clause] [order_by_clause] -> select_query
-select_list : "*" | select_item ("," select_item)*
-select_item : [table_name "."] column_name
-from_clause : FROM table_name
-join_clause : join_item (join_item)*
-join_item: JOIN table_name ON join_condition
-join_condition : [table_name "."] column_name EQUAL [table_name "."] column_name
+select_query : SELECT select_list table_expression -> select_query
+select_list : "*"
+            | selected_column ("," selected_column)*
+selected_column : [table_name "."] column_name [AS column_name]
+table_expression : from_clause [where_clause]
+from_clause : FROM table_reference_list
+table_reference_list : referred_table ("," referred_table)*
+referred_table : table_name [AS table_name]
 where_clause : WHERE boolean_expr
 boolean_expr : boolean_term (OR boolean_term)*
 boolean_term : boolean_factor (AND boolean_factor)*
@@ -129,8 +124,6 @@ comp_operand : comparable_value
 comparable_value : INT | STR | DATE
 null_predicate : [table_name "."] column_name null_operation
 null_operation : IS [NOT] NULL
-order_by_clause : ORDER BY column_name [ASC | DESC]
-
 
 
 // INSERT

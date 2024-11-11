@@ -1,10 +1,14 @@
-from lark import Transformer
+import datetime
+from lark import Token, Transformer, Tree
 from database import Database
-from utils import get_first_child_by_rule
-from error import (
-    ColumnNotFoundError,
-    IncomparableTypeError,
-)  # Importing custom error classes
+from utils import (
+    BooleanCondition,
+    Condition,
+    NullCondition,
+    ColumnReference,
+    LiteralValue,
+    get_first_child_by_rule,
+)
 
 
 # MyTransformer class extends lark.Transformer.
@@ -13,6 +17,15 @@ from error import (
 class MyTransformer(Transformer):
     def __init__(self, database: Database):
         self.database = database
+
+    def select_query_deprecated(self, items):
+        from_clause = items[2].children[0]
+        table_reference_list = from_clause.children[1]
+        referred_table = table_reference_list.children[0]
+        referred_table_name_tree = referred_table.children[0]
+
+        referred_table_name = referred_table_name_tree.children[0].lower()
+        self.database.select_from_table(referred_table_name)
 
     def create_table_query(self, items):
         table_name = items[2].children[0].lower()
@@ -90,14 +103,78 @@ class MyTransformer(Transformer):
             table_name, column_list, pk_constraints, fk_constraints
         )
 
-    def select_query(self, items):
-        from_clause = items[2].children[0]
-        table_reference_list = from_clause.children[1]
-        referred_table = table_reference_list.children[0]
-        referred_table_name_tree = referred_table.children[0]
+    def parse_select_list(self, select_list):
+        ret = []
+        for select_item in select_list:
+            table = (
+                select_item.children[0]
+                if select_item.children[0] is None
+                else select_item.children[0].children[0].value
+            )
+            column = select_item.children[1].children[0].value
 
-        referred_table_name = referred_table_name_tree.children[0].lower()
-        self.database.select_from_table(referred_table_name)
+            ret.append(ColumnReference(table, column))
+        return ret
+
+    def parse_join_clause(self, join_clause):
+        ret = {}
+        ret["tables"] = []
+        ret["conditions"] = []
+
+        if join_clause is None:
+            return ret
+
+        join_clause = join_clause.children
+        for join_item in join_clause:
+            join_condition = join_item.children[3].children
+            ret["tables"].append(join_item.children[1].children[0].lower())
+            col_ref_1 = ColumnReference(
+                join_condition[0].children[0], join_condition[1].children[0]
+            )
+            col_ref_2 = ColumnReference(
+                join_condition[3].children[0], join_condition[4].children[0]
+            )
+            ret["conditions"].append(Condition(col_ref_1, "=", col_ref_2))
+        return ret
+
+    def select_query(self, items):
+        # for item in items[1:]:
+        #     print(item.pretty())
+        #     print("==================")
+
+        select_list = self.parse_select_list(items[1].children)
+
+        from_clause_table = items[2].children[1].children[0].lower()
+
+        join_clause = self.parse_join_clause(items[3])
+
+        referred_tables = [from_clause_table] + join_clause["tables"]
+        join_conditions = join_clause["conditions"]
+
+        if items[4] is not None:
+            where_clause = get_first_child_by_rule(items[4], "boolean_expr")
+            where_condition = self.parse_where_clause(where_clause)
+        else:
+            where_condition = None
+
+        # todo: 여기부터
+        order_by_column = None
+        order_by_direction = None
+
+        if items[5] is not None:
+            order_by_column = items[5].children[2].children[0].lower()
+            order_by_direction = "asc"
+            if items[5].children[3] is not None:
+                order_by_direction = items[5].children[3].lower()
+
+        self.database.select_from_table(
+            select_list,
+            referred_tables,
+            join_conditions,
+            where_condition,
+            order_by_column,
+            order_by_direction,
+        )
 
     def drop_table_query(self, items):
         self.database.drop_table(items[2].children[0])
@@ -151,103 +228,89 @@ class MyTransformer(Transformer):
         self.database.delete_from_table(table_name, condition)
 
     def parse_where_clause(self, where_clause):
-        try:
-            # Recursive parsing logic to convert boolean_expr to a lambda condition
-            print(where_clause)
-            if where_clause.data == "boolean_expr":
-                terms = [
-                    self.parse_where_clause(child)
-                    for child in where_clause.children
-                    if child.data == "boolean_term"
-                ]
-                return lambda row: any(term(row) for term in terms)
-            elif where_clause.data == "boolean_term":
-                factors = [
-                    self.parse_where_clause(child)
-                    for child in where_clause.children
-                    if child.data == "boolean_factor"
-                ]
-                return lambda row: all(factor(row) for factor in factors)
-            elif where_clause.data == "boolean_factor":
-                if where_clause.children[0] is None:
-                    return self.parse_where_clause(where_clause.children[1])
-                else:
-                    factor = self.parse_where_clause(where_clause.children[1])
-                    return lambda row: not factor(row)
-            elif where_clause.data == "boolean_test":
-                return self.parse_where_clause(where_clause.children[0])
-            elif where_clause.data == "parenthesized_boolean_expr":
-                return self.parse_where_clause(where_clause.children[1])
-            elif where_clause.data == "predicate":
-                return self.parse_where_clause(where_clause.children[0])
-            elif where_clause.data == "comparison_predicate":
-                left_operand = self.parse_operand(where_clause.children[0])
-                right_operand = self.parse_operand(where_clause.children[2])
-                operator = where_clause.children[1].value
-                return self.create_comparison_lambda(
-                    left_operand, right_operand, operator
-                )
-            elif where_clause.data == "null_predicate":
-                # Parse null_predicate for IS NULL or IS NOT NULL
-                column = self.parse_operand(where_clause.children[0])
-                is_not_null = (
-                    len(where_clause.children) > 2
-                    and where_clause.children[1].data == "NOT"
-                )
-                if is_not_null:
-                    return lambda row: column(row) is not None
-                else:
-                    return lambda row: column(row) is None
+        if where_clause.data == "boolean_expr":
+            terms = [
+                self.parse_where_clause(child)
+                for child in where_clause.children
+                if isinstance(child, Tree)
+            ]
+            if len(terms) == 1:
+                return terms[0]
             else:
-                raise ValueError(f"Unhandled tree node: {where_clause.data}")
-        except (ColumnNotFoundError, IncomparableTypeError) as e:
-            raise e
-        except Exception as e:
-            raise ValueError(f"Error while parsing WHERE clause: {str(e)}")
+                return BooleanCondition(terms[0], "OR", terms[1])
+
+        elif where_clause.data == "boolean_term":
+            factors = [
+                self.parse_where_clause(child)
+                for child in where_clause.children
+                if isinstance(child, Tree)
+            ]
+            if len(factors) == 1:
+                return factors[0]
+            else:
+                return BooleanCondition(factors[0], "AND", factors[1])
+
+        elif where_clause.data == "boolean_factor":
+            if where_clause.children[0] is None:
+                return self.parse_where_clause(where_clause.children[1])
+            else:
+                factor = self.parse_where_clause(where_clause.children[1])
+                return BooleanCondition(factor, "NOT")
+
+        elif where_clause.data == "boolean_test":
+            return self.parse_where_clause(where_clause.children[0])
+
+        elif where_clause.data == "parenthesized_boolean_expr":
+            return self.parse_where_clause(where_clause.children[1])
+
+        elif where_clause.data == "predicate":
+            return self.parse_where_clause(where_clause.children[0])
+
+        elif where_clause.data == "comparison_predicate":
+            left_operand = self.parse_operand(where_clause.children[0])
+            right_operand = self.parse_operand(where_clause.children[2])
+            operator = where_clause.children[1].value
+
+            return Condition(left_operand, operator, right_operand)
+
+        elif where_clause.data == "null_predicate":
+            table_name = None
+            if where_clause.children[0] is not None:  # [table_name, column_name]
+                table_name = where_clause.children[0].children[0].value.lower()
+
+            column_name = where_clause.children[1].children[0].value.lower()
+
+            null_operation = where_clause.children[2]
+            is_not_null = null_operation.children[1] is not None
+            return NullCondition(ColumnReference(table_name, column_name), is_not_null)
 
     def parse_operand(self, operand):
-        try:
-            print(operand)
-            # Parse the operand to distinguish between column_name and literal value
-            if operand.data == "column_name":
-                column_name = operand.children[0].value
-                return lambda row: row[column_name]
-            elif operand.data == "comparable_value":
-                value = operand.children[0].value
-                return lambda _: value  # 모든 값을 람다 함수로 반환하여 일관성 유지
-            else:
-                raise ValueError(f"Unhandled operand type: {operand.data}")
-        except KeyError as e:
-            raise ColumnNotFoundError
-        except Exception as e:
-            raise ValueError(f"Error while parsing operand: {str(e)}")
+        # Parse the operand to distinguish between column_name and literal value
+        if (
+            operand.children[0] is not None
+            and operand.children[0].data == "comparable_value"
+        ):
+            value = operand.children[0].children[0].value
 
-    def create_comparison_lambda(self, left, right, operator):
-        def comparison(row):
-            try:
-                left_value = left(row)
-                right_value = right(row)
+            # Handle different types of comparable values
+            if operand.children[0].children[0].type == "STR":
+                # Strip quotation marks from the string value
+                return LiteralValue(value.strip("'\""))
+            elif operand.children[0].children[0].type == "DATE":
+                # Convert string to datetime object
+                parsed_date = datetime.datetime.strptime(value, "%Y-%m-%d")
+                return LiteralValue(parsed_date)
+            elif operand.children[0].children[0].type == "INT":
+                # Convert string to integer
+                return LiteralValue(int(value))
 
-                if operator == "=":
-                    return left_value == right_value
-                elif operator == "!=":
-                    return left_value != right_value
-                elif operator == "<":
-                    return left_value < right_value
-                elif operator == ">":
-                    return left_value > right_value
-                elif operator == "<=":
-                    return left_value <= right_value
-                elif operator == ">=":
-                    return left_value >= right_value
-                else:
-                    raise ValueError(f"Unhandled comparison operator: {operator}")
-            except KeyError:
-                raise ColumnNotFoundError
-            except TypeError:
-                raise IncomparableTypeError
+        else:
+            table_name = None
+            if operand.children[0] is not None:  # [table_name, column_name]
+                table_name = operand.children[0].children[0].value.lower()
 
-        return comparison
+            column_name = operand.children[1].children[0].value.lower()
+            return ColumnReference(table_name, column_name)
 
     def exit_command(self, items):
         self.database.close()
