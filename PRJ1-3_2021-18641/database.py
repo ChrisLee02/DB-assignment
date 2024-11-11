@@ -391,7 +391,6 @@ class Database:
             # dummy를 활용해 select_list, join where condition을 검증
             for i in select_list:
                 get_value(i, table_dummy_data_row, referred_tables)
-            
 
             for i in join_conditions:
                 evaluate_condition(i, table_dummy_data_row, referred_tables)
