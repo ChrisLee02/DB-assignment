@@ -138,10 +138,6 @@ class MyTransformer(Transformer):
         return ret
 
     def select_query(self, items):
-        # for item in items[1:]:
-        #     print(item.pretty())
-        #     print("==================")
-
         select_list = self.parse_select_list(items[1].children)
 
         from_clause_table = items[2].children[1].children[0].lower()
@@ -157,7 +153,6 @@ class MyTransformer(Transformer):
         else:
             where_condition = None
 
-        # todo: 여기부터
         order_by_column = None
         order_by_direction = None
 

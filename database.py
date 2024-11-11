@@ -388,10 +388,14 @@ class Database:
                     **table_dummy_data_row,
                     **table_meta.get_dummy_row(),
                 }
-
+            print(table_dummy_data_row)
+            print("hi")
             # dummy를 활용해 select_list, join where condition을 검증
             for i in select_list:
+                print(i) 
                 get_value(i, table_dummy_data_row, referred_tables)
+            
+            print("hi")
 
             for i in join_conditions:
                 evaluate_condition(i, table_dummy_data_row, referred_tables)
@@ -425,34 +429,32 @@ class Database:
                     elif len(matching_columns) > 1:
                         raise AmbiguousReference """
 
-            # print([str(i) for i in select_list])
             rows = table_data_list[referred_tables[0]]
             if len(referred_tables) > 1:
                 rows = [
-                    {**row_a, **row_b}
-                    for table_pair in product(*table_data_list.values())
-                    for row_a, row_b in [table_pair]
+                    {key: value for row in combined_row for key, value in row.items()}
+                    for combined_row in product(*table_data_list.values())
                 ]
-
-            # print(rows)
 
             # join
-
-            new_rows = []
-            for row in rows:
-                result = [
-                    evaluate_condition(con, row, referred_tables)
-                    for con in join_conditions
-                ]
-                if all(result):
-                    new_rows.append(row)
-            rows = new_rows
-
-            new_rows = []
-            for row in rows:
-                if evaluate_condition(where_condition, row, referred_tables):
-                    new_rows.append(row)
-            rows = new_rows
+            print("hi")
+            if not join_conditions:
+                new_rows = []
+                for row in rows:
+                    result = [
+                        evaluate_condition(con, row, referred_tables)
+                        for con in join_conditions
+                    ]
+                    if all(result):
+                        new_rows.append(row)
+                rows = new_rows
+            print("hi")
+            if where_condition is not None:
+                new_rows = []
+                for row in rows:
+                    if evaluate_condition(where_condition, row, referred_tables):
+                        new_rows.append(row)
+                rows = new_rows
 
             if order_by_column is not None:
                 # column 유효성 검증

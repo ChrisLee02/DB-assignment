@@ -1,0 +1,380 @@
+=====================================
+1th: Running query: 
+        CREATE TABLE students (
+            id CHAR(10) NOT NULL,
+            name CHAR(20),
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> students table is created
+=====================================
+=====================================
+2th: Running query: 
+        CREATE TABLE lectures (
+            id INT NOT NULL,
+            name CHAR(20),
+            capacity INT,
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> lectures table is created
+=====================================
+=====================================
+3th: Running query: 
+        CREATE TABLE apply (
+            s_id CHAR(10) NOT NULL,
+            l_id INT NOT NULL,
+            apply_date DATE,
+            PRIMARY KEY (s_id, l_id),
+            FOREIGN KEY (s_id) REFERENCES students(id),
+            FOREIGN KEY (l_id) REFERENCES lectures(id)
+        );
+        
+DB_2021-18641> apply table is created
+=====================================
+=====================================
+4th: Running query: 
+        INSERT INTO students (id, name)
+        VALUES ('S001', 'Alice');
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+5th: Running query: 
+        INSERT INTO students (id, name)
+        VALUES ('S002', 'Bob');
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+6th: Running query: 
+        INSERT INTO lectures (id, name, capacity)
+        VALUES (101, 'Math', 50);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+7th: Running query: 
+        INSERT INTO lectures (id, name, capacity)
+        VALUES (102, 'Physics', 30);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+8th: Running query: 
+        INSERT INTO apply (s_id, l_id, apply_date)
+        VALUES ('S001', 101, 2023-01-15);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+9th: Running query: 
+        INSERT INTO apply (s_id, l_id, apply_date)
+        VALUES ('S002', 102, 2023-02-20);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+10th: Running query: 
+        SELECT * FROM students;
+        
+----------------------------------
+students.id | students.name       
+----------------------------------
+S001        | Alice               
+S002        | Bob                 
+----------------------------------
+2 rows in set
+=====================================
+=====================================
+11th: Running query: 
+        SELECT * FROM lectures;
+        
+------------------------------------------------------
+lectures.id | lectures.name        | lectures.capacity
+------------------------------------------------------
+101         | Math                 | 50               
+102         | Physics              | 30               
+------------------------------------------------------
+2 rows in set
+=====================================
+=====================================
+12th: Running query: 
+        SELECT * FROM apply;
+        
+---------------------------------------------
+apply.s_id | apply.l_id | apply.apply_date   
+---------------------------------------------
+S001       | 101        | 2023-01-15         
+S002       | 102        | 2023-02-20         
+---------------------------------------------
+2 rows in set
+=====================================
+Database reset: DB file removed.
+=====================================
+1th: Running query: 
+        CREATE TABLE students (
+            id CHAR(10) NOT NULL,
+            name CHAR(20),
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> students table is created
+=====================================
+=====================================
+2th: Running query: 
+        CREATE TABLE lectures (
+            id INT NOT NULL,
+            name CHAR(20),
+            capacity INT,
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> lectures table is created
+=====================================
+=====================================
+3th: Running query: 
+        CREATE TABLE apply (
+            s_id CHAR(10) NOT NULL,
+            l_id INT NOT NULL,
+            apply_date DATE,
+            PRIMARY KEY (s_id, l_id),
+            FOREIGN KEY (s_id) REFERENCES students(id),
+            FOREIGN KEY (l_id) REFERENCES lectures(id)
+        );
+        
+DB_2021-18641> apply table is created
+=====================================
+=====================================
+4th: Running query: 
+        INSERT INTO students (id, name)
+        VALUES ('S001', 'Alice');
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+5th: Running query: 
+        INSERT INTO students (id, name)
+        VALUES ('S002', 'Bob');
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+6th: Running query: 
+        INSERT INTO students (id, name)
+        VALUES ('S003', 'Charlie');
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+7th: Running query: 
+        INSERT INTO lectures (id, name, capacity)
+        VALUES (101, 'Math', 50);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+8th: Running query: 
+        INSERT INTO lectures (id, name, capacity)
+        VALUES (102, 'Physics', 30);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+9th: Running query: 
+        INSERT INTO apply (s_id, l_id, apply_date)
+        VALUES ('S001', 101, 2023-01-15);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+10th: Running query: 
+        INSERT INTO apply (s_id, l_id, apply_date)
+        VALUES ('S002', 102, 2023-02-20);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+11th: Running query: 
+        INSERT INTO apply (s_id, l_id, apply_date)
+        VALUES ('S003', 101, 2023-03-10);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+12th: Running query: 
+        SELECT students.name, lectures.name,lectures.capacity, apply.apply_date
+        FROM students
+        JOIN apply ON students.id = apply.s_id
+        JOIN lectures ON apply.l_id = lectures.id
+        WHERE lectures.capacity > 30
+        ORDER BY apply_date DESC;
+        
+-------------------------------------------------------------------------------------
+students.name        | lectures.name        | lectures.capacity | apply.apply_date   
+-------------------------------------------------------------------------------------
+Alice                | Math                 | 50                | 2023-03-10         
+Bob                  | Math                 | 50                | 2023-03-10         
+Charlie              | Math                 | 50                | 2023-03-10         
+Alice                | Math                 | 50                | 2023-02-20         
+Bob                  | Math                 | 50                | 2023-02-20         
+Charlie              | Math                 | 50                | 2023-02-20         
+Alice                | Math                 | 50                | 2023-01-15         
+Bob                  | Math                 | 50                | 2023-01-15         
+Charlie              | Math                 | 50                | 2023-01-15         
+-------------------------------------------------------------------------------------
+9 rows in set
+=====================================
+Database reset: DB file removed.
+=====================================
+1th: Running query: 
+        CREATE TABLE students (
+            id CHAR(10) NOT NULL,
+            name CHAR(20),
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> students table is created
+=====================================
+=====================================
+2th: Running query: 
+        CREATE TABLE lectures (
+            id INT NOT NULL,
+            name CHAR(20),
+            capacity INT,
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> lectures table is created
+=====================================
+=====================================
+3th: Running query: 
+        CREATE TABLE apply (
+            s_id CHAR(10) NOT NULL,
+            l_id INT NOT NULL,
+            apply_date DATE,
+            PRIMARY KEY (s_id, l_id),
+            FOREIGN KEY (s_id) REFERENCES students(id),
+            FOREIGN KEY (l_id) REFERENCES lectures(id)
+        );
+        
+DB_2021-18641> apply table is created
+=====================================
+=====================================
+4th: Running query: 
+        INSERT INTO students (id, name)
+        VALUES ('S001', 'Alice');
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+5th: Running query: 
+        INSERT INTO students (id, name)
+        VALUES ('S002', 'Bob');
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+6th: Running query: 
+        INSERT INTO lectures (id, name, capacity)
+        VALUES (101, 'Math', 50);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+7th: Running query: 
+        INSERT INTO lectures (id, name, capacity)
+        VALUES (102, 'Physics', 30);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+8th: Running query: 
+        INSERT INTO apply (s_id, l_id, apply_date)
+        VALUES ('S001', 101, 2023-01-15);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+9th: Running query: 
+        INSERT INTO apply (s_id, l_id, apply_date)
+        VALUES ('S002', 102, 2023-02-20);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+10th: Running query: 
+        SELECT students.name, apply.apply_date
+        FROM students
+        JOIN apply ON students.id = apply.s_id
+        WHERE apply.apply_date > 2023-01-01
+        ORDER BY name ASC;
+        
+------------------------------------------
+students.name        | apply.apply_date   
+------------------------------------------
+Alice                | 2023-01-15         
+Alice                | 2023-02-20         
+Bob                  | 2023-01-15         
+Bob                  | 2023-02-20         
+------------------------------------------
+4 rows in set
+=====================================
+Database reset: DB file removed.
+=====================================
+1th: Running query: 
+        CREATE TABLE students (
+            id CHAR(10) NOT NULL,
+            name CHAR(20),
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> students table is created
+=====================================
+=====================================
+2th: Running query: 
+        CREATE TABLE lectures (
+            id INT NOT NULL,
+            name CHAR(20),
+            capacity INT,
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> lectures table is created
+=====================================
+=====================================
+3th: Running query: 
+        CREATE TABLE apply (
+            s_id CHAR(10) NOT NULL,
+            l_id INT NOT NULL,
+            apply_date DATE,
+            PRIMARY KEY (s_id, l_id),
+            FOREIGN KEY (s_id) REFERENCES students(id),
+            FOREIGN KEY (l_id) REFERENCES lectures(id)
+        );
+        
+DB_2021-18641> apply table is created
+=====================================
+=====================================
+4th: Running query: 
+        INSERT INTO students (id, name)
+        VALUES ('S001', 'Alice');
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+5th: Running query: 
+        INSERT INTO lectures (id, name, capacity)
+        VALUES (101, 'Math', 50);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+6th: Running query: 
+        SELECT students.name, lectures.name
+        FROM students
+        JOIN apply ON students.id = apply.nonexistent_column;
+        
+DB_2021-18641> SELECT clause trying to reference tables which are not specified
+=====================================
+Database reset: DB file removed.

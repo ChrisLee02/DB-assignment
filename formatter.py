@@ -12,8 +12,6 @@ class Formatter:
         # set each col_width as max width of column(header or any rows)
         # for appearance, set minimum total width as 15
 
-        # todo: 여기서 get 가져오도록
-        # todo: 여기서 date의 경우 따로 또 포매팅해줘야한다.
         headers = [i.column if i.table is None else str(i) for i in headers_col_refs]
         col_widths = [len(header) for header in headers]
         for row in rows:
@@ -43,7 +41,6 @@ class Formatter:
             # if no rows exist, only print headers and separator lines
             table = "\n".join([separator_line, header_line, separator_line])
         else:
-            # 각 row를 headers 순서에 맞게 정렬하여 출력 형식에 맞춘 문자열 생성
             row_lines = [
                 format_str.format(
                     *[
@@ -56,7 +53,7 @@ class Formatter:
                             else get_value(header, row, referred_tables).strftime(
                                 "%Y-%m-%d"
                             )
-                        )  # 원하는 형식
+                        ) 
                         for header in headers_col_refs
                     ]
                 )

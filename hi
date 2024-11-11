@@ -1,0 +1,219 @@
+=====================================
+1th: Running query: 
+        CREATE TABLE students (
+            id CHAR(10) NOT NULL,
+            name CHAR(20),
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> students table is created
+=====================================
+=====================================
+2th: Running query: 
+        INSERT INTO students (id, name)
+        VALUES ('S001', 'Alice');
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+3th: Running query: 
+        SELECT * FROM students;
+        
+----------------------------------
+students.id | students.name       
+----------------------------------
+S001        | Alice               
+----------------------------------
+1 row in set
+=====================================
+Database reset: DB file removed.
+=====================================
+1th: Running query: 
+        INSERT INTO nonexistent_table (id, name)
+        VALUES ('S002', 'Bob');
+        
+DB_2021-18641> Insert into has failed: no such table
+=====================================
+Database reset: DB file removed.
+=====================================
+1th: Running query: 
+        CREATE TABLE students (
+            id CHAR(10) NOT NULL,
+            name CHAR(20),
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> students table is created
+=====================================
+=====================================
+2th: Running query: 
+        INSERT INTO students (id)
+        VALUES ('S003', 'Charlie');
+        
+DB_2021-18641> Insert has failed: types are not matched
+=====================================
+Database reset: DB file removed.
+=====================================
+1th: Running query: 
+        CREATE TABLE students (
+            id CHAR(10) NOT NULL,
+            name CHAR(20),
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> students table is created
+=====================================
+=====================================
+2th: Running query: 
+        INSERT INTO students (id, name)
+        VALUES (NULL, 'Daisy');
+        
+DB_2021-18641> Insert has failed: 'id' is not nullable
+=====================================
+Database reset: DB file removed.
+=====================================
+1th: Running query: 
+        CREATE TABLE students (
+            id CHAR(10) NOT NULL,
+            name CHAR(20),
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> students table is created
+=====================================
+=====================================
+2th: Running query: 
+        INSERT INTO students (id, name)
+        VALUES ('S001', 'Alice');
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+3th: Running query: 
+        DELETE FROM students WHERE id = 'S001';
+        
+DB_2021-18641> 1 row(s) deleted
+=====================================
+=====================================
+4th: Running query: 
+        SELECT * FROM students;
+        
+---------------------------
+students.id | students.name
+---------------------------
+0 rows in set
+=====================================
+Database reset: DB file removed.
+=====================================
+1th: Running query: 
+        DELETE FROM nonexistent_table WHERE id = 'S001';
+        
+DB_2021-18641> Delete from has failed: no such table
+=====================================
+Database reset: DB file removed.
+=====================================
+1th: Running query: 
+        CREATE TABLE students (
+            id CHAR(10) NOT NULL,
+            name CHAR(20),
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> students table is created
+=====================================
+=====================================
+2th: Running query: 
+        CREATE TABLE apply (
+            s_id CHAR(10) NOT NULL,
+            l_id INT NOT NULL,
+            PRIMARY KEY (s_id, l_id)
+        );
+        
+DB_2021-18641> apply table is created
+=====================================
+=====================================
+3th: Running query: 
+        INSERT INTO students (id, name)
+        VALUES ('S001', 'Alice');
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+4th: Running query: 
+        INSERT INTO apply (s_id, l_id)
+        VALUES ('S001', 101);
+        
+DB_2021-18641> 1 row inserted
+=====================================
+=====================================
+5th: Running query: 
+        SELECT students.id, students.name, apply.l_id
+        FROM students
+        JOIN apply ON students.id = apply.s_id;
+        
+-----------------------------------------------
+students.id | students.name        | apply.l_id
+-----------------------------------------------
+S001        | Alice                | 101       
+-----------------------------------------------
+1 row in set
+=====================================
+Database reset: DB file removed.
+=====================================
+1th: Running query: 
+        CREATE TABLE students (
+            id CHAR(10) NOT NULL,
+            name CHAR(20),
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> students table is created
+=====================================
+=====================================
+2th: Running query: 
+        CREATE TABLE apply (
+            s_id CHAR(10) NOT NULL,
+            l_id INT NOT NULL,
+            PRIMARY KEY (s_id, l_id)
+        );
+        
+DB_2021-18641> apply table is created
+=====================================
+=====================================
+3th: Running query: 
+        SELECT students.id, apply.l_id
+        FROM students
+        JOIN apply ON students.nonexistent_column = apply.s_id;
+        
+DB_2021-18641> SELECT clause trying to reference non existing column
+=====================================
+Database reset: DB file removed.
+=====================================
+1th: Running query: 
+        CREATE TABLE students (
+            id CHAR(10) NOT NULL,
+            name CHAR(20),
+            PRIMARY KEY (id)
+        );
+        
+DB_2021-18641> students table is created
+=====================================
+=====================================
+2th: Running query: 
+        CREATE TABLE apply (
+            s_id CHAR(10) NOT NULL,
+            l_id INT NOT NULL,
+            PRIMARY KEY (s_id, l_id)
+        );
+        
+DB_2021-18641> apply table is created
+=====================================
+=====================================
+3th: Running query: 
+        SELECT students.id, apply.l_id
+        FROM students
+        JOIN apply ON students.id = apply.l_id;
+        
+DB_2021-18641> Trying to compare incomparable columns or values
+=====================================
+Database reset: DB file removed.

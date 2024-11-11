@@ -63,8 +63,8 @@ class NullCondition:
 class BooleanCondition:
     def __init__(self, left, operator, right=None):
         self.left = left  # Could be Condition, NullCondition, or BooleanCondition
-        self.operator = operator  # AND, OR, NOT 중 하나
-        self.right = right  # AND, OR인 경우 오른쪽 표현식
+        self.operator = operator  # AND, OR, NOT
+        self.right = right  # for AND, OR
 
     def __str__(self):
         if self.operator == "NOT":
@@ -73,10 +73,6 @@ class BooleanCondition:
 
 
 def evaluate_condition(condition, row, from_tables):
-    # todo: 지워야함.
-    # print("evaluate:")
-    # print(condition)
-    # print(row)
     if isinstance(condition, Condition):
         left_value = get_value(condition.left_operand, row, from_tables)
         right_value = get_value(condition.right_operand, row, from_tables)
@@ -85,7 +81,6 @@ def evaluate_condition(condition, row, from_tables):
         if type(left_value) != type(right_value):
             raise IncomparableTypeError()
 
-        # 공백 제거 처리 (오른쪽 공백만 제거)
         if isinstance(left_value, str):
             left_value = left_value.rstrip()
         if isinstance(right_value, str):
