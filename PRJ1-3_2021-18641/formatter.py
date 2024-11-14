@@ -53,7 +53,7 @@ class Formatter:
                             else get_value(header, row, referred_tables).strftime(
                                 "%Y-%m-%d"
                             )
-                        ) 
+                        )
                         for header in headers_col_refs
                     ]
                 )

@@ -389,40 +389,69 @@ class Database:
                     **table_meta.get_dummy_row(),
                 }
             # dummy를 활용해 select_list, join where condition을 검증
+            # todo: select_list는
             for i in select_list:
-                get_value(i, table_dummy_data_row, referred_tables)
+                try:
+                    get_value(i, table_dummy_data_row, referred_tables)
+                except TableNotSpecified:
+                    MessageHandler.print_error(
+                        MessageKeys.SELECT_TABLE_EXISTENCE_ERROR, table_name=i.table
+                    )
+                    return
+                except ColumnNotFoundError:
+                    MessageHandler.print_error(
+                        MessageKeys.SELECT_COLUMN_RESOLVE_ERROR, col_name=i.column
+                    )
+                    return
+                except AmbiguousReference:
+                    MessageHandler.print_error(
+                        MessageKeys.SELECT_COLUMN_RESOLVE_ERROR, col_name=i.column
+                    )
+                    return
 
-            for i in join_conditions:
-                evaluate_condition(i, table_dummy_data_row, referred_tables)
+            try:
+                for i in join_conditions:
+                    evaluate_condition(i, table_dummy_data_row, referred_tables)
+            except TableNotSpecified:
+                MessageHandler.print_error(
+                    MessageKeys.TABLE_NOT_SPECIFIED, clause_name="JOIN"
+                )
+                return
+            except ColumnNotFoundError:
+                MessageHandler.print_error(
+                    MessageKeys.COLUMN_NOT_EXIST, clause_name="JOIN"
+                )
+                return
+            except AmbiguousReference:
+                MessageHandler.print_error(
+                    MessageKeys.AMBIGUOUS_REFERENCE, clause_name="JOIN"
+                )
+                return
 
-            evaluate_condition(where_condition, table_dummy_data_row, referred_tables)
+            try:
+                evaluate_condition(
+                    where_condition, table_dummy_data_row, referred_tables
+                )
+            except TableNotSpecified:
+                MessageHandler.print_error(
+                    MessageKeys.TABLE_NOT_SPECIFIED, clause_name="WHERE"
+                )
+                return
+            except ColumnNotFoundError:
+                MessageHandler.print_error(
+                    MessageKeys.COLUMN_NOT_EXIST, clause_name="WHERE"
+                )
+                return
+            except AmbiguousReference:
+                MessageHandler.print_error(
+                    MessageKeys.AMBIGUOUS_REFERENCE, clause_name="WHERE"
+                )
+                return
 
             table_data_list = {
                 table_name: self.get_table_data(table_name.lower())
                 for table_name in referred_tables
             }
-
-            """ for col_ref in select_list:
-                if col_ref.table is not None:
-                    if col_ref.table not in referred_tables:
-                        raise TableNotSpecified
-                    table_meta = table_metadata_list[col_ref.table]
-                    matching_columns = list(
-                        filter(lambda col: col_ref.column == col["name"], table_meta.columns.values())
-                    )
-                    if len(matching_columns) == 0:
-                        raise ColumnNotFoundError
-                else:
-                    matching_columns = [
-                        col["name"]
-                        for table_meta in table_metadata_list.values()
-                        for col in table_meta.columns.values()
-                        if col_ref.column == col["name"]
-                    ]
-                    if len(matching_columns) == 0:
-                        raise ColumnNotFoundError
-                    elif len(matching_columns) > 1:
-                        raise AmbiguousReference """
 
             rows = table_data_list[referred_tables[0]]
             if len(referred_tables) > 1:
@@ -431,60 +460,97 @@ class Database:
                     for combined_row in product(*table_data_list.values())
                 ]
 
-            # join
-            if not join_conditions:
-                new_rows = []
-                for row in rows:
-                    result = [
-                        evaluate_condition(con, row, referred_tables)
-                        for con in join_conditions
-                    ]
-                    if all(result):
-                        new_rows.append(row)
-                rows = new_rows
-            if where_condition is not None:
-                new_rows = []
-                for row in rows:
-                    if evaluate_condition(where_condition, row, referred_tables):
-                        new_rows.append(row)
-                rows = new_rows
-
-            if order_by_column is not None:
-                # column 유효성 검증
-                get_value(
-                    ColumnReference(None, order_by_column),
-                    table_dummy_data_row,
-                    referred_tables,
+            try:
+                # join
+                if not join_conditions:
+                    new_rows = []
+                    for row in rows:
+                        result = [
+                            evaluate_condition(con, row, referred_tables)
+                            for con in join_conditions
+                        ]
+                        if all(result):
+                            new_rows.append(row)
+                    rows = new_rows
+            except TableNotSpecified:
+                MessageHandler.print_error(
+                    MessageKeys.TABLE_NOT_SPECIFIED, clause_name="JOIN"
                 )
-                rows.sort(
-                    key=lambda row: get_value(
+                return
+            except ColumnNotFoundError:
+                MessageHandler.print_error(
+                    MessageKeys.COLUMN_NOT_EXIST, clause_name="JOIN"
+                )
+                return
+            except AmbiguousReference:
+                MessageHandler.print_error(
+                    MessageKeys.AMBIGUOUS_REFERENCE, clause_name="JOIN"
+                )
+                return
+
+            try:
+                if where_condition is not None:
+                    new_rows = []
+                    for row in rows:
+                        if evaluate_condition(where_condition, row, referred_tables):
+                            new_rows.append(row)
+                    rows = new_rows
+            except TableNotSpecified:
+                MessageHandler.print_error(
+                    MessageKeys.TABLE_NOT_SPECIFIED, clause_name="WHERE"
+                )
+                return
+            except ColumnNotFoundError:
+                MessageHandler.print_error(
+                    MessageKeys.COLUMN_NOT_EXIST, clause_name="WHERE"
+                )
+                return
+            except AmbiguousReference:
+                MessageHandler.print_error(
+                    MessageKeys.AMBIGUOUS_REFERENCE, clause_name="WHERE"
+                )
+                return
+
+            try:
+                if order_by_column is not None:
+                    # column 유효성 검증
+                    get_value(
                         ColumnReference(None, order_by_column),
-                        row,
+                        table_dummy_data_row,
                         referred_tables,
-                    ),
-                    reverse=(order_by_direction == "desc"),
+                    )
+                    rows.sort(
+                        key=lambda row: get_value(
+                            ColumnReference(None, order_by_column),
+                            row,
+                            referred_tables,
+                        ),
+                        reverse=(order_by_direction == "desc"),
+                    )
+            except TableNotSpecified:
+                MessageHandler.print_error(
+                    MessageKeys.TABLE_NOT_SPECIFIED, clause_name="ORDER BY"
                 )
-
+                return
+            except ColumnNotFoundError:
+                MessageHandler.print_error(
+                    MessageKeys.COLUMN_NOT_EXIST, clause_name="ORDER BY"
+                )
+                return
+            except AmbiguousReference:
+                MessageHandler.print_error(
+                    MessageKeys.AMBIGUOUS_REFERENCE, clause_name="ORDER BY"
+                )
+                return
             # Formatting table to display
             table_str = Formatter.format_table_select(
                 select_list, rows, referred_tables
             )
             footer = Formatter.format_footer(len(rows))
             print("\n".join([table_str, footer]))
-        except ColumnNotFoundError:
-            MessageHandler.print_error(
-                MessageKeys.COLUMN_NOT_EXIST, clause_name="SELECT"
-            )
+
         except IncomparableTypeError:
             MessageHandler.print_error(MessageKeys.INCOMPARABLE_ERROR)
-        except TableNotSpecified:
-            MessageHandler.print_error(
-                MessageKeys.TABLE_NOT_SPECIFIED, clause_name="SELECT"
-            )
-        except AmbiguousReference:
-            MessageHandler.print_error(
-                MessageKeys.AMBIGUOUS_REFERENCE, clause_name="SELECT"
-            )
 
     def delete_from_table(self, table_name: str, condition):
         try:
@@ -526,17 +592,17 @@ class Database:
 
         except ColumnNotFoundError:
             MessageHandler.print_error(
-                MessageKeys.COLUMN_NOT_EXIST, clause_name="DELETE"
+                MessageKeys.COLUMN_NOT_EXIST, clause_name="WHERE"
             )
         except IncomparableTypeError:
             MessageHandler.print_error(MessageKeys.INCOMPARABLE_ERROR)
         except TableNotSpecified:
             MessageHandler.print_error(
-                MessageKeys.TABLE_NOT_SPECIFIED, clause_name="DELETE"
+                MessageKeys.TABLE_NOT_SPECIFIED, clause_name="WHERE"
             )
         except AmbiguousReference:
             MessageHandler.print_error(
-                MessageKeys.AMBIGUOUS_REFERENCE, clause_name="DELETE"
+                MessageKeys.AMBIGUOUS_REFERENCE, clause_name="WHERE"
             )
 
     def close(self):

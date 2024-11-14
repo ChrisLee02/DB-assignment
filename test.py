@@ -235,6 +235,13 @@ additional_test_cases = [
         FROM students
         JOIN apply ON students.id = apply.nonexistent_column;
         """,
+        """
+        SELECT students.name
+        FROM students
+        JOIN lectures ON students.id = lectures.capacity
+        where C.name = 1
+        ;
+        """,
     ],
 ]
 
