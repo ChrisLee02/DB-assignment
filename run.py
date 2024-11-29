@@ -14,12 +14,8 @@ connection: MySQLConnectionAbstract = connect(
     password="DB2021_18641",
     db="DB2021_18641",
     charset="utf8mb4",
-    collation="utf8mb4_bin",
+    collation="utf8mb4_0900_as_ci",
 )
-
-# todo: case insensitive하게 변경
-# 글자수 제한 변경
-# 양의 "정수" 만 받도록
 
 
 def drop_tables(cursor):
@@ -93,8 +89,6 @@ def reset():
 
 
 def print_DVDs():
-    # YOUR CODE GOES HERE
-    # print msg
     cursor = connection.cursor(dictionary=True)
     query = """
         SELECT 
@@ -164,7 +158,6 @@ def print_users():
 def insert_DVD():
     title = input("DVD title: ")
     director = input("DVD director: ")
-    # YOUR CODE GOES HERE
     cursor = connection.cursor()
 
     try:
@@ -172,7 +165,7 @@ def insert_DVD():
             print(Messages.get_message("E1"))
             return
 
-        if len(director) < 1 or len(director) > 40:
+        if len(director) < 1 or len(director) > 50:
             print(Messages.get_message("E2"))
             return
 
@@ -191,8 +184,6 @@ def insert_DVD():
 
 def remove_DVD():
     DVD_id = input("DVD ID: ")
-    # YOUR CODE GOES HERE
-    # print msg
     cursor = connection.cursor()
 
     try:
@@ -227,12 +218,10 @@ def remove_DVD():
 def insert_user():
     name = input("User name: ")
     age = input("User age: ")
-    # YOUR CODE GOES HERE
-    # print msg
 
     try:
         cursor = connection.cursor()
-        if len(name) < 1 or len(name) > 30:
+        if len(name) < 1 or len(name) > 50:
             print(Messages.get_message("E4"))
             return
 
@@ -257,8 +246,6 @@ def insert_user():
 
 def remove_user():
     user_id = input("User ID: ")
-    # YOUR CODE GOES HERE
-    # print msg
     cursor = connection.cursor()
 
     try:
@@ -452,8 +439,6 @@ def print_borrowing_status_for_user():
 
 def search_DVD():
     query = input("Query: ")
-    # YOUR CODE GOES HERE
-    # print msg
     cursor = connection.cursor(dictionary=True)
     search_query = f"%{query}%"
     sql = """
@@ -498,9 +483,13 @@ def search_Director():
     sql = """
         SELECT 
             DVDs.director AS 'director', 
-            AVG(BorrowRecords.rating) AS 'director.rating', 
+            AVG(BorrowRecords.rating) AS 'director_rating', 
             COUNT(BorrowRecords.record_id) AS 'cumul_rent_cnt', 
-            GROUP_CONCAT(DISTINCT DVDs.title ORDER BY DVDs.title ASC) AS 'all_movies'
+            CONCAT(
+                '[', 
+                GROUP_CONCAT(DISTINCT DVDs.title ORDER BY DVDs.title ASC SEPARATOR ', '), 
+                ']'
+    ) AS 'all_movies'
         FROM 
             DVDs
         LEFT JOIN 
@@ -529,13 +518,9 @@ def search_Director():
 
 
 def recommend_popularity():
-    # YOUR CODE GOES HERE
     user_id = input("User ID: ")
-    # YOUR CODE GOES HERE
-    # print msg
     cursor = connection.cursor(dictionary=True)
     try:
-        # Check if user exists
         check_user = "SELECT u_id FROM Users WHERE u_id = %s"
         cursor.execute(check_user, (user_id,))
         if not cursor.fetchone():
@@ -571,7 +556,6 @@ def recommend_popularity():
         cursor.execute(query_highest_rated, (user_id,))
         highest_rated_dvd = cursor.fetchone()
 
-        # Query to get the most borrowed DVD
         query_most_borrowed = """
             SELECT 
                 DVDs.d_id AS 'id', 
@@ -601,7 +585,6 @@ def recommend_popularity():
         cursor.execute(query_most_borrowed, (user_id,))
         most_borrowed_dvd = cursor.fetchone()
 
-        # Print the results
         print_records_recommend(
             [highest_rated_dvd],
             ["id", "title", "director", "avg_rating", "cumul_rent_cnt", "quantity"],
@@ -622,9 +605,6 @@ def recommend_popularity():
 
 def recommend_user_based():
     user_id = input("User ID: ")
-    # YOUR CODE GOES HER
-    # print msg
-    # 안해
     pass
 
 

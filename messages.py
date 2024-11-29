@@ -1,5 +1,4 @@
 class Messages:
-    # 성공 메시지
     SUCCESS = {
         "S1": "Database successfully initialized",
         "S2": "User successfully added",
@@ -11,12 +10,11 @@ class Messages:
         "S8": "Bye!",
     }
 
-    # 에러 메시지
     ERROR = {
-        "E1": "Title length should range from 1 to 30 characters",
-        "E2": "Author length should range from 1 to 20 characters",
+        "E1": "Title length should range from 1 to 100 characters",
+        "E2": "Author length should range from 1 to 50 characters",
         "E3": "DVD ({title}, {director}) already exists",
-        "E4": "Username length should range from 1 to 10 characters",
+        "E4": "Username length should range from 1 to 50 characters",
         "E5": "DVD {d_id} does not exist",
         "E6": "Cannot delete a DVD that is currently borrowed",
         "E7": "User {u_id} does not exist",
@@ -33,7 +31,6 @@ class Messages:
 
     @staticmethod
     def get_message(code, **kwargs):
-        """Retrieve formatted message by code."""
         if code in Messages.SUCCESS:
             return Messages.SUCCESS[code]
         elif code in Messages.ERROR:

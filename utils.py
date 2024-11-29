@@ -1,10 +1,15 @@
+from decimal import Decimal
+
+
 def print_records(rows: list[dict], headers: list[str]):
     column_widths = {header: len(header) for header in headers}
     for row in rows:
         for header in headers:
             value = row.get(header, "")
-            if header == "avg.rating" and isinstance(value, (float, int)):
-                value = f"{value:.3f}"
+            if value is None:
+                value = "None"
+            elif isinstance(value, (float, Decimal)):
+                value = f"{float(value):.3f}"
             column_widths[header] = max(column_widths[header], len(str(value)))
 
     header_line = "  ".join(f"{header:<{column_widths[header]}}" for header in headers)
@@ -19,9 +24,7 @@ def print_records(rows: list[dict], headers: list[str]):
     for row in rows:
         row_line = "  ".join(
             (
-                f"{str(row.get(header, '')):<{column_widths[header]}}"
-                if header != "avg.rating"
-                else f"{row.get(header, ''):.3f:<{column_widths[header]}}"
+                f"{'None' if row.get(header) is None else (f'{float(row.get(header)):.3f}' if isinstance(row.get(header), (float, Decimal)) else str(row.get(header))):<{column_widths[header]}}"
             )
             for header in headers
         )
@@ -34,8 +37,10 @@ def print_records_recommend(rows: list[dict], headers: list[str], message: str):
     for row in rows:
         for header in headers:
             value = row.get(header, "")
-            if header == "avg.rating" and isinstance(value, (float, int)):
-                value = f"{value:.3f}"
+            if value is None:
+                value = "None"
+            elif isinstance(value, (float, Decimal)):
+                value = f"{float(value):.3f}"
             column_widths[header] = max(column_widths[header], len(str(value)))
 
     header_line = "  ".join(f"{header:<{column_widths[header]}}" for header in headers)
@@ -52,12 +57,10 @@ def print_records_recommend(rows: list[dict], headers: list[str], message: str):
     for row in rows:
         row_line = "  ".join(
             (
-                f"{str(row.get(header, '')):<{column_widths[header]}}"
-                if header != "avg.rating"
-                else f"{row.get(header, ''):.3f:<{column_widths[header]}}"
+                f"{'None' if row.get(header) is None else (f'{float(row.get(header)):.3f}' if isinstance(row.get(header), (float, Decimal)) else str(row.get(header))):<{column_widths[header]}}"
             )
             for header in headers
         )
         print(row_line)
-    if message == "Rating-based":
+    if message == "Popularity-based":
         print(separator_line)
