@@ -280,6 +280,14 @@ def check_stock(cursor, d_id):
     return cursor.fetchone()[0]
 
 
+def check_dvd_borrowed(cursor, DVD_id):
+    cursor.execute(
+        "SELECT d_id FROM BorrowRecords WHERE d_id = %s AND status = 'borrowed'",
+        (DVD_id,),
+    )
+    return cursor.fetchone() is not None
+
+
 def check_borrowed_by_user(cursor, user_id):
     query = """
         SELECT record_id 
@@ -291,12 +299,14 @@ def check_borrowed_by_user(cursor, user_id):
 
 
 def check_if_dvd_borrowed_by_user(cursor, user_id, dvd_id):
-    query = """
+    cursor.execute(
+        """
                 SELECT record_id 
                 FROM BorrowRecords 
         WHERE u_id = %s AND d_id = %s AND status = 'borrowed'
-    """
-    cursor.execute(query, (user_id, dvd_id))
+    """,
+        (user_id, dvd_id),
+    )
     return cursor.fetchone() is not None
 
 

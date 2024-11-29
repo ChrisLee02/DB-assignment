@@ -1,10 +1,9 @@
-from mysql.connector import connect, errorcode
+from mysql.connector import connect
 from mysql.connector.abstracts import MySQLConnectionAbstract
 from messages import Messages
 import queries
 import mysql.connector.errors as mysqlerrors
 from utils import print_records, print_records_recommend
-import pandas as pd
 
 
 connection: MySQLConnectionAbstract = connect(
@@ -113,7 +112,7 @@ def remove_DVD():
             print(Messages.get_message("E5", d_id=DVD_id))
             return
 
-        if queries.check_borrowed(cursor, DVD_id):
+        if queries.check_dvd_borrowed(cursor, DVD_id):
             print(Messages.get_message("E6"))
             return
 
