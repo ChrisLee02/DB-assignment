@@ -18,54 +18,12 @@ connection: MySQLConnectionAbstract = connect(
 )
 
 
-def drop_tables(cursor):
-    for drop_sql in queries.DROP_TABLES:
-        try:
-            cursor.execute(drop_sql)
-        except mysqlerrors.Error as err:
-            print(f"Error dropping table: {err.msg}")
-
-
-def create_tables(cursor):
-    for create_sql in queries.CREATE_TABLES:
-        try:
-            cursor.execute(create_sql)
-        except mysqlerrors.Error as err:
-            print(f"Error creating table: {err.msg}")
-
-
-def initialize_from_csv(cursor):
-    file_path = "data.csv"
-    data = pd.read_csv(file_path)
-
-    unique_d = data[["d_id", "d_title", "d_name"]].drop_duplicates().sort_values("d_id")
-    unique_u = data[["u_id", "u_name", "u_age"]].drop_duplicates().sort_values("u_id")
-
-    for _, row in unique_d.iterrows():
-        try:
-            sql = "INSERT INTO DVDs (title, director) VALUES (%s, %s)"
-            cursor.execute(sql, (row["d_title"], row["d_name"]))
-        except mysqlerrors.DataError as e:
-            if e.errno == errorcode.ER_DATA_TOO_LONG:
-                print(f"Error: The title '{row['d_title']}' is too long.")
-            else:
-                print(e.msg)
-
-    for _, row in unique_u.iterrows():
-        sql = "INSERT INTO Users (name, age) VALUES (%s, %s)"
-        cursor.execute(sql, (row["u_name"], row["u_age"]))
-
-    for _, row in data.iterrows():
-        sql = "INSERT INTO BorrowRecords (d_id, u_id, rating, status) VALUES (%s, %s, %s, 'returned')"
-        cursor.execute(sql, (row["d_id"], row["u_id"], row["rating"]))
-
-
 def initialize_database():
     cursor = connection.cursor()
     try:
-        drop_tables(cursor)
-        create_tables(cursor)
-        initialize_from_csv(cursor)
+        queries.drop_tables(cursor)
+        queries.create_tables(cursor)
+        queries.initialize_from_csv(cursor)
         connection.commit()
         print("Database successfully initialized")
     except Exception as e:
@@ -77,9 +35,9 @@ def initialize_database():
 def reset():
     cursor = connection.cursor()
     try:
-        drop_tables(cursor)
-        create_tables(cursor)
-        initialize_from_csv(cursor)
+        queries.drop_tables(cursor)
+        queries.create_tables(cursor)
+        queries.initialize_from_csv(cursor)
         connection.commit()
         print("Database successfully reset")
     except Exception as e:
@@ -90,28 +48,9 @@ def reset():
 
 def print_DVDs():
     cursor = connection.cursor(dictionary=True)
-    query = """
-        SELECT 
-            DVDs.d_id AS 'id', 
-            DVDs.title AS 'title', 
-            DVDs.director AS 'director', 
-            AVG(BorrowRecords.rating) AS 'avg.rating', 
-            COUNT(BorrowRecords.record_id) AS 'cumul_rent_cnt', 
-            DVDs.stock AS 'quantity'
-        FROM 
-            DVDs
-        LEFT JOIN 
-            BorrowRecords ON DVDs.d_id = BorrowRecords.d_id and BorrowRecords.status = 'returned'
-        GROUP BY 
-            DVDs.d_id
-        ORDER BY 
-            AVG(BorrowRecords.rating) DESC, 
-            COUNT(BorrowRecords.record_id) DESC,
-            DVDs.d_id ASC
-    """
+
     try:
-        cursor.execute(query)
-        results = cursor.fetchall()
+        results = queries.select_dvds(cursor)
         headers = [desc[0] for desc in cursor.description]
         if not results:
             results = []
@@ -125,25 +64,9 @@ def print_DVDs():
 
 def print_users():
     cursor = connection.cursor(dictionary=True)
-    query = """
-        SELECT 
-            Users.u_id AS 'id', 
-            Users.name AS 'name', 
-            Users.age AS 'age', 
-            AVG(BorrowRecords.rating) AS 'avg.rating', 
-            COUNT(BorrowRecords.record_id) AS 'cumul_rent_cnt'
-        FROM 
-            Users
-        LEFT JOIN 
-            BorrowRecords ON Users.u_id = BorrowRecords.u_id and BorrowRecords.status = 'returned'
-        GROUP BY 
-            Users.u_id
-        ORDER BY 
-            Users.u_id
-    """
+
     try:
-        cursor.execute(query)
-        results = cursor.fetchall()
+        results = queries.select_users(cursor)
         headers = [desc[0] for desc in cursor.description]
         if not results:
             results = []
@@ -169,8 +92,7 @@ def insert_DVD():
             print(Messages.get_message("E2"))
             return
 
-        sql = "INSERT INTO DVDs (title, director) VALUES (%s, %s)"
-        cursor.execute(sql, (title, director))
+        queries.insert_dvd(cursor, title, director)
         connection.commit()
         print(Messages.get_message("S3"))
     except mysqlerrors.IntegrityError:
@@ -187,24 +109,15 @@ def remove_DVD():
     cursor = connection.cursor()
 
     try:
-        check_dvd = "SELECT d_id FROM DVDs WHERE d_id = %s"
-        cursor.execute(check_dvd, (DVD_id,))
-        if not cursor.fetchone():
+        if not queries.check_dvd(cursor, DVD_id):
             print(Messages.get_message("E5", d_id=DVD_id))
             return
 
-        check_borrowed = """
-            SELECT record_id 
-            FROM BorrowRecords 
-            WHERE d_id = %s AND status = 'borrowed'
-        """
-        cursor.execute(check_borrowed, (DVD_id,))
-        if cursor.fetchone() is not None:
+        if queries.check_borrowed(cursor, DVD_id):
             print(Messages.get_message("E6"))
             return
 
-        delete_dvd = "DELETE FROM DVDs WHERE d_id = %s"
-        cursor.execute(delete_dvd, (DVD_id,))
+        queries.delete_dvd(cursor, DVD_id)
         connection.commit()
         print(Messages.get_message("S5"))
 
@@ -231,8 +144,7 @@ def insert_user():
 
         age = int(age)
 
-        sql = "INSERT INTO Users (name, age) VALUES (%s, %s)"
-        cursor.execute(sql, (name, age))
+        queries.insert_user(cursor, name, age)
         connection.commit()
         print(Messages.get_message("S2"))
     except mysqlerrors.IntegrityError:
@@ -249,24 +161,15 @@ def remove_user():
     cursor = connection.cursor()
 
     try:
-        check_user = "SELECT u_id FROM Users WHERE u_id = %s"
-        cursor.execute(check_user, (user_id,))
-        if not cursor.fetchone():
+        if not queries.check_user(cursor, user_id):
             print(Messages.get_message("E7", u_id=user_id))
             return
 
-        check_borrowed = """
-            SELECT record_id 
-            FROM BorrowRecords 
-            WHERE u_id = %s AND status = 'borrowed'
-        """
-        cursor.execute(check_borrowed, (user_id,))
-        if cursor.fetchone() is not None:
+        if queries.check_borrowed_by_user(cursor, user_id):
             print(Messages.get_message("E8"))
             return
 
-        delete_user = "DELETE FROM Users WHERE u_id = %s"
-        cursor.execute(delete_user, (user_id,))
+        queries.delete_user(cursor, user_id)
         connection.commit()
         print(Messages.get_message("S4"))
 
@@ -282,48 +185,29 @@ def checkout_DVD():
     user_id = input("User ID: ")
     cursor = connection.cursor()
     try:
-        check_dvd = "SELECT stock FROM DVDs WHERE d_id = %s"
-        cursor.execute(check_dvd, (DVD_id,))
-        dvd = cursor.fetchone()
-        if not dvd:
+        if not queries.check_dvd(cursor, DVD_id):
             print(Messages.get_message("E5", d_id=DVD_id))
             return
 
-        check_user = "SELECT borrow_count FROM Users WHERE u_id = %s"
-        cursor.execute(check_user, (user_id,))
-        user = cursor.fetchone()
-        if not user:
+        if not queries.check_user(cursor, user_id):
             print(Messages.get_message("E7", u_id=user_id))
             return
 
-        if dvd[0] == 0:
+        if queries.check_stock(cursor, DVD_id) == 0:
             print(Messages.get_message("E9"))
             return
 
-        check_borrowed_same_dvd = """
-            SELECT record_id 
-            FROM BorrowRecords 
-            WHERE u_id = %s AND d_id = %s AND status = 'borrowed'
-        """
-        cursor.execute(check_borrowed_same_dvd, (user_id, DVD_id))
-        if cursor.fetchone() is not None:
+        if queries.check_if_dvd_borrowed_by_user(cursor, user_id, DVD_id):
             print(Messages.get_message("E15"))
             return
 
-        if user[0] >= 3:
+        if queries.check_borrow_count(cursor, user_id) >= 3:
             print(Messages.get_message("E10", u_id=user_id))
             return
 
-        borrow_dvd = "INSERT INTO BorrowRecords (d_id, u_id) VALUES (%s, %s)"
-        cursor.execute(borrow_dvd, (DVD_id, user_id))
-
-        update_stock = "UPDATE DVDs SET stock = stock - 1 WHERE d_id = %s"
-        cursor.execute(update_stock, (DVD_id,))
-
-        update_borrow_count = (
-            "UPDATE Users SET borrow_count = borrow_count + 1 WHERE u_id = %s"
-        )
-        cursor.execute(update_borrow_count, (user_id,))
+        queries.insert_borrow_record(cursor, DVD_id, user_id)
+        queries.update_stock_decrement(cursor, DVD_id)
+        queries.update_borrow_count_increment(cursor, user_id)
 
         connection.commit()
         print(Messages.get_message("S6"))
@@ -342,17 +226,11 @@ def return_and_rate_DVD():
     try:
         cursor = connection.cursor()
 
-        check_dvd = "SELECT * FROM DVDs WHERE d_id = %s"
-        cursor.execute(check_dvd, (DVD_id,))
-        dvd = cursor.fetchone()
-        if not dvd:
+        if not queries.check_dvd(cursor, DVD_id):
             print(Messages.get_message("E5", d_id=DVD_id))
             return
 
-        check_user = "SELECT * FROM Users WHERE u_id = %s"
-        cursor.execute(check_user, (user_id,))
-        user = cursor.fetchone()
-        if not user:
+        if not queries.check_user(cursor, user_id):
             print(Messages.get_message("E7", u_id=user_id))
             return
 
@@ -360,32 +238,14 @@ def return_and_rate_DVD():
             print(Messages.get_message("E11"))
             return
 
-        check_borrowed = """
-            SELECT record_id 
-            FROM BorrowRecords 
-            WHERE u_id = %s AND d_id = %s AND status = 'borrowed'
-        """
-        cursor.execute(check_borrowed, (user_id, DVD_id))
-        borrow_record = cursor.fetchone()
-        if not borrow_record:
+        if not queries.check_if_dvd_borrowed_by_user(cursor, user_id, DVD_id):
             print(Messages.get_message("E12"))
             return
 
-        update_borrow_record = """
-            UPDATE BorrowRecords 
-            SET status = 'returned', rating = %s 
-            WHERE record_id = %s
-        """
-        cursor.execute(update_borrow_record, (rating, borrow_record[0]))
+        queries.update_borrow_record(cursor, rating, user_id, DVD_id)
 
-        update_stock = "UPDATE DVDs SET stock = stock + 1 WHERE d_id = %s"
-        cursor.execute(update_stock, (DVD_id,))
-
-        update_borrow_count = (
-            "UPDATE Users SET borrow_count = borrow_count - 1 WHERE u_id = %s"
-        )
-
-        cursor.execute(update_borrow_count, (user_id,))
+        queries.update_stock_increment(cursor, DVD_id)
+        queries.update_borrow_count_decrement(cursor, user_id)
 
         connection.commit()
         print(Messages.get_message("S7"))
@@ -402,31 +262,11 @@ def print_borrowing_status_for_user():
 
     cursor = connection.cursor(dictionary=True)
     try:
-        check_user = "SELECT u_id FROM Users WHERE u_id = %s"
-        cursor.execute(check_user, (user_id,))
-        if not cursor.fetchone():
+        if not queries.check_user(cursor, user_id):
             print(Messages.get_message("E7", u_id=user_id))
             return
 
-        query = """
-            SELECT 
-                DVDs.d_id AS 'id', 
-                DVDs.title AS 'title', 
-                DVDs.director AS 'director', 
-                (SELECT AVG(rating) FROM BorrowRecords WHERE d_id = DVDs.d_id) AS 'avg.rating'
-            FROM 
-                BorrowRecords
-            JOIN 
-                DVDs ON BorrowRecords.d_id = DVDs.d_id
-            WHERE 
-                BorrowRecords.u_id = %s AND BorrowRecords.status = 'borrowed'
-            GROUP BY 
-                DVDs.d_id
-            ORDER BY 
-                DVDs.d_id ASC
-        """
-        cursor.execute(query, (user_id,))
-        results = cursor.fetchall()
+        results = queries.select_borrowed_dvds_by_user(cursor, user_id)
         headers = [desc[0] for desc in cursor.description]
         if not results:
             results = []
@@ -441,30 +281,9 @@ def search_DVD():
     query = input("Query: ")
     cursor = connection.cursor(dictionary=True)
     search_query = f"%{query}%"
-    sql = """
-        SELECT 
-            DVDs.d_id AS 'id', 
-            DVDs.title AS 'title', 
-            DVDs.director AS 'director', 
-            AVG(BorrowRecords.rating) AS 'avg.rating', 
-            COUNT(BorrowRecords.record_id) AS 'cumul_rent_cnt', 
-            DVDs.stock AS 'quantity'
-        FROM 
-            DVDs
-        LEFT JOIN 
-            BorrowRecords ON DVDs.d_id = BorrowRecords.d_id and BorrowRecords.status = 'returned'
-        WHERE 
-            LOWER(DVDs.title) LIKE LOWER(%s)
-        GROUP BY 
-            DVDs.d_id
-        ORDER BY 
-            AVG(BorrowRecords.rating) DESC, 
-            COUNT(BorrowRecords.record_id) DESC,
-            DVDs.d_id ASC
-    """
+
     try:
-        cursor.execute(sql, (search_query,))
-        results = cursor.fetchall()
+        results = queries.search_dvd_by_title(cursor, search_query)
         headers = [desc[0] for desc in cursor.description]
         if not results:
             print(Messages.get_message("E16"))
@@ -480,32 +299,9 @@ def search_Director():
     query = input("Query: ")
     cursor = connection.cursor(dictionary=True)
     search_query = f"%{query}%"
-    sql = """
-        SELECT 
-            DVDs.director AS 'director', 
-            AVG(BorrowRecords.rating) AS 'director_rating', 
-            COUNT(BorrowRecords.record_id) AS 'cumul_rent_cnt', 
-            CONCAT(
-                '[', 
-                GROUP_CONCAT(DISTINCT DVDs.title ORDER BY DVDs.title ASC SEPARATOR ', '), 
-                ']'
-    ) AS 'all_movies'
-        FROM 
-            DVDs
-        LEFT JOIN 
-            BorrowRecords ON DVDs.d_id = BorrowRecords.d_id and BorrowRecords.status = 'returned'
-        WHERE 
-            LOWER(DVDs.director) LIKE LOWER(%s)
-        GROUP BY 
-            DVDs.director
-        ORDER BY 
-            AVG(BorrowRecords.rating) DESC, 
-            COUNT(BorrowRecords.record_id) DESC,
-            DVDs.director ASC
-    """
+
     try:
-        cursor.execute(sql, (search_query,))
-        results = cursor.fetchall()
+        results = queries.search_director_query(cursor, search_query)
         headers = [desc[0] for desc in cursor.description]
         if not results:
             print(Messages.get_message("E16"))
@@ -521,69 +317,12 @@ def recommend_popularity():
     user_id = input("User ID: ")
     cursor = connection.cursor(dictionary=True)
     try:
-        check_user = "SELECT u_id FROM Users WHERE u_id = %s"
-        cursor.execute(check_user, (user_id,))
-        if not cursor.fetchone():
+        if not queries.check_user(cursor, user_id):
             print(Messages.get_message("E7", u_id=user_id))
             return
 
-        query_highest_rated = """
-            SELECT 
-                DVDs.d_id AS 'id', 
-                DVDs.title AS 'title', 
-                DVDs.director AS 'director', 
-                AVG(BorrowRecords.rating) AS 'avg_rating', 
-                COUNT(BorrowRecords.record_id) AS 'cumul_rent_cnt', 
-                DVDs.stock AS 'quantity'
-            FROM 
-                DVDs
-            LEFT JOIN 
-                BorrowRecords ON DVDs.d_id = BorrowRecords.d_id
-            WHERE 
-                DVDs.d_id NOT IN (
-                    SELECT d_id 
-                    FROM BorrowRecords 
-                    WHERE u_id = %s AND rating IS NOT NULL
-                )
-            GROUP BY 
-                DVDs.d_id
-            ORDER BY 
-                AVG(BorrowRecords.rating) DESC, 
-                COUNT(BorrowRecords.record_id) DESC, 
-                DVDs.d_id ASC
-            LIMIT 1
-        """
-        cursor.execute(query_highest_rated, (user_id,))
-        highest_rated_dvd = cursor.fetchone()
-
-        query_most_borrowed = """
-            SELECT 
-                DVDs.d_id AS 'id', 
-                DVDs.title AS 'title', 
-                DVDs.director AS 'director', 
-                AVG(BorrowRecords.rating) AS 'avg_rating', 
-                COUNT(BorrowRecords.record_id) AS 'cumul_rent_cnt', 
-                DVDs.stock AS 'quantity'
-            FROM 
-                DVDs
-            LEFT JOIN 
-                BorrowRecords ON DVDs.d_id = BorrowRecords.d_id
-            WHERE 
-                DVDs.d_id NOT IN (
-                    SELECT d_id 
-                    FROM BorrowRecords 
-                    WHERE u_id = %s AND rating IS NOT NULL
-                )
-            GROUP BY 
-                DVDs.d_id
-            ORDER BY 
-                COUNT(BorrowRecords.record_id) DESC, 
-                AVG(BorrowRecords.rating) DESC, 
-                DVDs.d_id ASC
-            LIMIT 1
-        """
-        cursor.execute(query_most_borrowed, (user_id,))
-        most_borrowed_dvd = cursor.fetchone()
+        highest_rated_dvd = queries.get_highest_rated_dvd(cursor, user_id)
+        most_borrowed_dvd = queries.get_most_borrowed_dvd(cursor, user_id)
 
         print_records_recommend(
             [highest_rated_dvd],
